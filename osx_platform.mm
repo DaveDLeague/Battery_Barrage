@@ -74,10 +74,10 @@ int main(int argc, char** argv){
     //METAL BUFFER SETUP
     float sz = 0.8;
     float vertices[] = {
-        -sz, -sz,   0, 0, 1, 1,     0, 1,
-         -sz, sz,   1, 0, 0, 1,     0, 0,
-         sz, sz,    0, 1, 0, 1,     1, 0,
-         sz, -sz,   1, 1, 0, 1,     1, 1,
+        -sz, -sz,  0, 1,
+         -sz, sz,  0, 0,
+         sz, sz,   1, 0,
+         sz, -sz,  1, 1,
     };
 
     unsigned short indices[] = {
@@ -97,19 +97,14 @@ int main(int argc, char** argv){
     attribDescriptor.offset = 0;
     attribDescriptor.bufferIndex = 0;
     [vertDescriptor.attributes setObject: attribDescriptor atIndexedSubscript: 0];
-    MTLVertexAttributeDescriptor *colorDescriptor = [MTLVertexAttributeDescriptor new];
-    attribDescriptor.format = MTLVertexFormatFloat4;
+    MTLVertexAttributeDescriptor *texDescriptor = [MTLVertexAttributeDescriptor new];
+    attribDescriptor.format = MTLVertexFormatFloat2;
     attribDescriptor.offset = sizeof(float) * 2;
     attribDescriptor.bufferIndex = 0;
     [vertDescriptor.attributes setObject: attribDescriptor atIndexedSubscript: 1];
-    MTLVertexAttributeDescriptor *texDescriptor = [MTLVertexAttributeDescriptor new];
-    attribDescriptor.format = MTLVertexFormatFloat2;
-    attribDescriptor.offset = sizeof(float) * 6;
-    attribDescriptor.bufferIndex = 0;
-    [vertDescriptor.attributes setObject: attribDescriptor atIndexedSubscript: 2];
     
     MTLVertexBufferLayoutDescriptor *layoutDescriptor = [MTLVertexBufferLayoutDescriptor new];
-    layoutDescriptor.stride = sizeof(float) * 8;
+    layoutDescriptor.stride = sizeof(float) * 4;
     layoutDescriptor.stepFunction = MTLVertexStepFunctionPerVertex;
     layoutDescriptor.stepRate = 1;
     [vertDescriptor.layouts setObject: layoutDescriptor atIndexedSubscript: 0];
@@ -166,6 +161,11 @@ int main(int argc, char** argv){
                withBytes:textureData
                bytesPerRow:12];
 
+    MTLSamplerDescriptor *samplerDescriptor = [MTLSamplerDescriptor new];
+    samplerDescriptor.minFilter = MTLSamplerMinMagFilterNearest;
+    samplerDescriptor.magFilter = MTLSamplerMinMagFilterNearest;
+    id<MTLSamplerState> samplerState = [device newSamplerStateWithDescriptor: samplerDescriptor];
+
     [window setContentView:view];
 
     NSEvent* ev;  
@@ -180,10 +180,6 @@ int main(int argc, char** argv){
                     switch([ev keyCode]){
                         case 53:{
                             [NSApp terminate: NSApp];
-                            break;
-                        }
-                        case 0:{
-                            NSLog(@"A\n");
                             break;
                         }
                     }
@@ -204,6 +200,7 @@ int main(int argc, char** argv){
 
             [renderEncoder setFragmentTexture:texture
                                 atIndex:0];
+            [renderEncoder setFragmentSamplerState:samplerState atIndex: 0];
 
             [renderEncoder drawIndexedPrimitives:MTLPrimitiveTypeTriangle
                         indexCount:6
