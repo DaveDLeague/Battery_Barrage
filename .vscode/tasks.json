@@ -2,7 +2,7 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "build",
+            "label": "build and run",
             "type": "shell",
             "command": "./build.sh && ./game",
             "group": {
@@ -12,7 +12,17 @@
             "problemMatcher": "$msCompile"
         },
         {
-            "label": "test",
+            "label": "build only",
+            "type": "shell",
+            "command": "./build.sh",
+            "group": {
+                "kind":"build",
+                "isDefault": true,
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "run",
             "type": "shell",
             "command": "./game ",
             "group": {
