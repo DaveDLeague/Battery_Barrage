@@ -74,13 +74,14 @@ int main(int argc, char** argv){
     //METAL BUFFER SETUP
     float sz = 0.8;
     float vertices[] = {
-        -sz, -sz,
-         0, sz,
-         sz, -sz,
+        -sz, -sz,   0, 0, 1, 1,     0, 1,
+         -sz, sz,   1, 0, 0, 1,     0, 0,
+         sz, sz,    0, 1, 0, 1,     1, 0,
+         sz, -sz,   1, 1, 0, 1,     1, 1,
     };
 
     unsigned short indices[] = {
-        0, 1, 2
+        0, 1, 2, 2, 3, 0
     };
 
     id<MTLBuffer> indexBuffer = [device newBufferWithBytes: indices
@@ -96,9 +97,19 @@ int main(int argc, char** argv){
     attribDescriptor.offset = 0;
     attribDescriptor.bufferIndex = 0;
     [vertDescriptor.attributes setObject: attribDescriptor atIndexedSubscript: 0];
+    MTLVertexAttributeDescriptor *colorDescriptor = [MTLVertexAttributeDescriptor new];
+    attribDescriptor.format = MTLVertexFormatFloat4;
+    attribDescriptor.offset = sizeof(float) * 2;
+    attribDescriptor.bufferIndex = 0;
+    [vertDescriptor.attributes setObject: attribDescriptor atIndexedSubscript: 1];
+    MTLVertexAttributeDescriptor *texDescriptor = [MTLVertexAttributeDescriptor new];
+    attribDescriptor.format = MTLVertexFormatFloat2;
+    attribDescriptor.offset = sizeof(float) * 6;
+    attribDescriptor.bufferIndex = 0;
+    [vertDescriptor.attributes setObject: attribDescriptor atIndexedSubscript: 2];
     
     MTLVertexBufferLayoutDescriptor *layoutDescriptor = [MTLVertexBufferLayoutDescriptor new];
-    layoutDescriptor.stride = sizeof(float) * 2;
+    layoutDescriptor.stride = sizeof(float) * 8;
     layoutDescriptor.stepFunction = MTLVertexStepFunctionPerVertex;
     layoutDescriptor.stepRate = 1;
     [vertDescriptor.layouts setObject: layoutDescriptor atIndexedSubscript: 0];
@@ -132,6 +143,28 @@ int main(int argc, char** argv){
         NSLog(@"Failed to created pipeline state, error %@", err);
         return 1;
     }
+
+
+    //METAL TEXTURE SETUP
+    unsigned char textureData[] = {
+        0, 0, 255, 255,     255, 0, 0, 255,     0, 255, 0, 255,
+        0, 255, 0, 255,     0, 0, 255, 255,     255, 0, 0, 255,
+        255, 0, 0, 255,     0, 255, 0, 255,     0, 0, 255, 255,     
+    };
+
+    MTLTextureDescriptor *textureDescriptor = [[MTLTextureDescriptor alloc] init];
+    textureDescriptor.width = 3;
+    textureDescriptor.height = 3;
+    textureDescriptor.pixelFormat = MTLPixelFormatRGBA8Unorm;
+    id<MTLTexture> texture = [device newTextureWithDescriptor: textureDescriptor];
+    MTLRegion region = {
+        {0, 0, 0},
+        { textureDescriptor.width , textureDescriptor.height, 1}
+    };
+    [texture replaceRegion:region
+               mipmapLevel:0
+               withBytes:textureData
+               bytesPerRow:12];
 
     [window setContentView:view];
 
@@ -169,8 +202,11 @@ int main(int argc, char** argv){
                                 offset:0
                                 atIndex:0];
 
+            [renderEncoder setFragmentTexture:texture
+                                atIndex:0];
+
             [renderEncoder drawIndexedPrimitives:MTLPrimitiveTypeTriangle
-                        indexCount:3
+                        indexCount:6
                         indexType:MTLIndexTypeUInt16
                         indexBuffer: indexBuffer
                         indexBufferOffset:0];

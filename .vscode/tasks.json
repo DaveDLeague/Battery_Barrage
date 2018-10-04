@@ -30,6 +30,16 @@
                 "isDefault": true,
             },
             "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "metal compile",
+            "type": "shell",
+            "command": "sh metal_compiler.sh basic_shader",
+            "group": {
+                "kind":"test",
+                "isDefault": true,
+            },
+            "problemMatcher": "$msCompile"
         }
     ]
 }
