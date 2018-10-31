@@ -11,14 +11,18 @@ struct VertOut{
     float2 texCoord;
 };
 
-vertex VertOut vertexShader(VertIn in[[stage_in]]){
+struct Uniforms {
+    float4x4 perspectiveMatrix;
+};
+
+vertex VertOut vertexShader(VertIn in[[stage_in]], constant Uniforms* uniforms[[buffer(2)]]){
     VertOut out;
-    out.position = float4(in.pos, 0, 1);
+    out.position = uniforms[0].perspectiveMatrix * float4(in.pos, 0, 1);
     out.texCoord = in.tex;
     return out;
 }
 
 fragment half4 fragmentShader(VertOut in [[stage_in]], texture2d<half> colorTexture[[texture(0)]], sampler defaultSampler[[sampler(0)]]){
     const half4 colorSample = colorTexture.sample(defaultSampler, in.texCoord);
-    return colorSample;
+    return half4(1 - colorSample.r, 1 - colorSample.r, 1 - colorSample.r, colorSample.r);
 }

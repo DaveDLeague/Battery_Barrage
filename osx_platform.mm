@@ -2,6 +2,11 @@
 #include <Metal/Metal.h>
 #include <MetalKit/MetalKit.h>
 #include <GameController/GameController.h>
+#include <dlfcn.h>
+#include "battery_barrage.cpp"
+
+#define WIDTH 900
+#define HEIGHT 500
 
 @class WindowDelegate;
 @interface WindowDelegate : NSView <NSWindowDelegate> {
@@ -16,15 +21,85 @@
 }
 @end
 
-int main(int argc, char** argv){
+void readFile(const s8* fileName, u8*& fileData, u64* fileLength){
+    NSString* string = [[NSString alloc] initWithCString: fileName
+                                        encoding: NSUTF8StringEncoding];
+    NSData* data = [NSData dataWithContentsOfFile: string];
+    
+    *fileLength = [data length];
+    fileData = (u8*)[data bytes];
+}
+
+void prepareTextBuffers(TextRenderer* textRenderer, f32* vertBuffer, u16* indBuffer){
+    FontAtlas* fa = &textRenderer->fontAtlas;
+    f32 totalWidth = (f32)fa->totalBitmapWidth;
+    f32 totalHeight = (f32)fa->totalBitmapHeight;
+    u32 vCtr = 0;
+    u32 iCtr = 0;
+    u32 vertCount = 0;
+    for(int i = 0; i < textRenderer->totalTextObjects; i++){
+        TextObject* fo = &textRenderer->textObjects[i];
+
+        const s8* text = fo->text;
+        f32 xOff;
+        f32 yOff;
+        f32 width;
+        f32 height;
+        f32 xShift;
+        f32 yShift;
+        f32 scale = fo->scale;
+    
+        f32 xMarker = (f32)fo->x;
+        f32 y = (f32)fo->y;
+        s8 c = *text;
+        while(c != '\0'){
+            for(u32 j = 0; j < fa->totalCharacters; j++){
+                if(fa->characterCodes[j] == c){
+                    xOff = (f32)fa->xOffsets[j];
+                    yOff = (f32)fa->yOffsets[j];
+                    width = (f32)fa->widths[j];
+                    height = (f32)fa->heights[j];
+                    xShift = (f32)fa->xShifts[j];
+                    yShift = (f32)fa->yShifts[j];
+                    break;
+                }
+            }
+
+            if(c != ' '){
+                vertBuffer[vCtr++] = xMarker; vertBuffer[vCtr++] = y + (yShift * scale);
+                vertBuffer[vCtr++] = xOff / totalWidth; vertBuffer[vCtr++] = yOff / totalHeight;
+
+                vertBuffer[vCtr++] = xMarker; vertBuffer[vCtr++] = y + ((yShift + height) * scale);
+                vertBuffer[vCtr++] = xOff / totalWidth; vertBuffer[vCtr++] = (yOff + height) / totalHeight;
+
+                vertBuffer[vCtr++] = xMarker + (width * scale); vertBuffer[vCtr++] = y + ((yShift + height) * scale);
+                vertBuffer[vCtr++] = (xOff + width) / totalWidth; vertBuffer[vCtr++] = (yOff + height) / totalHeight;
+
+                vertBuffer[vCtr++] = xMarker + (width * scale); vertBuffer[vCtr++] = y + (yShift * scale);
+                vertBuffer[vCtr++] = (xOff + width) / totalWidth; vertBuffer[vCtr++] = yOff / totalHeight;
+                vertCount += 4;
+
+                indBuffer[iCtr++] = vertCount - 4;
+                indBuffer[iCtr++] = vertCount - 3;
+                indBuffer[iCtr++] = vertCount - 2;
+                indBuffer[iCtr++] = vertCount - 2;
+                indBuffer[iCtr++] = vertCount - 1;
+                indBuffer[iCtr++] = vertCount - 4;
+            }
+
+            xMarker += xShift * scale;
+            text++;
+            c = *text;
+        }
+    }
+    textRenderer->totalVertices = vertCount;
+    textRenderer->totalIndices = (vertCount / 4) * 6;
+}
+
+int main(int argc, char** argv){ 
+    
     NSAutoreleasePool * pool = [[NSAutoreleasePool alloc] init]; 
     [NSApp sharedApplication];
-    
-    if([[GCController controllers] count]){
-        NSLog(@"Controller Found\n");
-    }else{
-        NSLog(@"Controller NOT Found\n");
-    }
 
     NSUInteger windowStyle = NSWindowStyleMaskTitled        | 
                              NSWindowStyleMaskClosable      | 
@@ -32,7 +107,7 @@ int main(int argc, char** argv){
                              NSWindowStyleMaskMiniaturizable;
 
 	NSRect screenRect = [[NSScreen mainScreen] frame];
-	NSRect viewRect = NSMakeRect(0, 0, 800, 600); 
+	NSRect viewRect = NSMakeRect(0, 0, WIDTH, HEIGHT); 
 	NSRect windowRect = NSMakeRect(NSMidX(screenRect) - NSMidX(viewRect),
 								 NSMidY(screenRect) - NSMidY(viewRect),
 								 viewRect.size.width, 
@@ -72,23 +147,39 @@ int main(int argc, char** argv){
     view.enableSetNeedsDisplay = false;
 
     //METAL BUFFER SETUP
-    float sz = 0.8;
+    float sz = 100;
     float vertices[] = {
-        -sz, -sz,  0, 1,
-         -sz, sz,  0, 0,
-         sz, sz,   1, 0,
-         sz, -sz,  1, 1,
+        0, 0,  0, 0,
+         0, sz,  0, 1,
+         sz, sz,   1, 1,
+         sz, 0,  1, 0,
     };
 
     unsigned short indices[] = {
         0, 1, 2, 2, 3, 0
     };
 
-    id<MTLBuffer> indexBuffer = [device newBufferWithBytes: indices
-                                        length: sizeof(indices)
+    struct Uniforms {
+        Matrix4 perspectiveMatrix;
+    };
+    Uniforms uniforms = {};
+    
+    uniforms.perspectiveMatrix = createOrthogonalProjectionMatrix(0, WIDTH, 0, HEIGHT, -1, 1);
+    
+    // id<MTLBuffer> indexBuffer = [device newBufferWithBytes: indices
+    //                                     length: sizeof(indices)
+    //                                     options: MTLResourceStorageModeShared];
+    // id<MTLBuffer> vertBuffer = [device newBufferWithBytes: vertices
+    //                                     length: sizeof(vertices)
+    //                                     options: MTLResourceStorageModeShared];
+    id<MTLBuffer> indexBuffer = [device newBufferWithLength: 10000
                                         options: MTLResourceStorageModeShared];
-    id<MTLBuffer> vertBuffer = [device newBufferWithBytes: vertices
-                                        length: sizeof(vertices)
+    id<MTLBuffer> vertBuffer = [device newBufferWithLength: 10000
+                                        options: MTLResourceStorageModeShared];
+
+
+    id<MTLBuffer> uniformBuffer = [device newBufferWithBytes: &uniforms
+                                        length: sizeof(uniforms)
                                         options: MTLResourceStorageModeShared];
     MTLVertexDescriptor *vertDescriptor = [MTLVertexDescriptor vertexDescriptor];
     
@@ -140,6 +231,14 @@ int main(int argc, char** argv){
     }
 
 
+    BatteryBarrageState* bbState = new BatteryBarrageState;
+    bbState->readFromFile = readFile;
+    bbState->gameWidth = WIDTH;
+    bbState->gameHeight = HEIGHT;
+    initializeGameState(bbState);
+
+    prepareTextBuffers(&bbState->textRenderer, (f32*)[vertBuffer contents], (u16*)[indexBuffer contents]);
+
     //METAL TEXTURE SETUP
     unsigned char textureData[] = {
         0, 0, 255, 255,     255, 0, 0, 255,     0, 255, 0, 255,
@@ -148,9 +247,9 @@ int main(int argc, char** argv){
     };
 
     MTLTextureDescriptor *textureDescriptor = [[MTLTextureDescriptor alloc] init];
-    textureDescriptor.width = 3;
-    textureDescriptor.height = 3;
-    textureDescriptor.pixelFormat = MTLPixelFormatRGBA8Unorm;
+    textureDescriptor.width = bbState->textRenderer.fontAtlas.totalBitmapWidth;
+    textureDescriptor.height = bbState->textRenderer.fontAtlas.totalBitmapHeight;
+    textureDescriptor.pixelFormat = MTLPixelFormatR8Unorm;
     id<MTLTexture> texture = [device newTextureWithDescriptor: textureDescriptor];
     MTLRegion region = {
         {0, 0, 0},
@@ -158,8 +257,8 @@ int main(int argc, char** argv){
     };
     [texture replaceRegion:region
                mipmapLevel:0
-               withBytes:textureData
-               bytesPerRow:12];
+               withBytes:bbState->textRenderer.fontAtlas.bitmap
+               bytesPerRow:bbState->textRenderer.fontAtlas.totalBitmapWidth];
 
     MTLSamplerDescriptor *samplerDescriptor = [MTLSamplerDescriptor new];
     samplerDescriptor.minFilter = MTLSamplerMinMagFilterNearest;
@@ -167,6 +266,20 @@ int main(int argc, char** argv){
     id<MTLSamplerState> samplerState = [device newSamplerStateWithDescriptor: samplerDescriptor];
 
     [window setContentView:view];
+
+    void* handle = dlopen("./libbb.so", RTLD_LAZY);
+    typedef void (*fnPtr)(float, BatteryBarrageState*);
+    fnPtr update = (fnPtr)dlsym(handle, "updateGameState");
+
+
+    NSString * path = @"./libbb.so";
+    NSDate * fileLastModifiedDate = nil;
+
+    NSError * error = nil;
+    NSDictionary * attrs = [[NSFileManager defaultManager] attributesOfItemAtPath:path error:&error];
+    if (attrs && !error){
+        fileLastModifiedDate = [attrs fileModificationDate];
+    }
 
     NSEvent* ev;  
     while(true){
@@ -188,29 +301,51 @@ int main(int argc, char** argv){
                 }
             }
         } while (ev);
-        id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
-        MTLRenderPassDescriptor *renderPassDescriptor = view.currentRenderPassDescriptor;
-        if(renderPassDescriptor){
-            renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
-            [renderEncoder setRenderPipelineState:pipelineState];
 
-            [renderEncoder setVertexBuffer:vertBuffer
-                                offset:0
-                                atIndex:0];
-
-            [renderEncoder setFragmentTexture:texture
-                                atIndex:0];
-            [renderEncoder setFragmentSamplerState:samplerState atIndex: 0];
-
-            [renderEncoder drawIndexedPrimitives:MTLPrimitiveTypeTriangle
-                        indexCount:6
-                        indexType:MTLIndexTypeUInt16
-                        indexBuffer: indexBuffer
-                        indexBufferOffset:0];
-
-            [renderEncoder endEncoding];
-            [commandBuffer presentDrawable:view.currentDrawable];
+        #ifdef DEBUG_COMPILE
+        attrs = [[NSFileManager defaultManager] attributesOfItemAtPath:path error:&error];
+        if (attrs && !error){
+            if([[attrs fileModificationDate] compare:fileLastModifiedDate] != NSOrderedSame){
+                dlclose(handle);
+                handle = dlopen("./libbb.so", RTLD_LAZY);
+                update = (fnPtr)dlsym(handle, "updateGameState");
+                initializeGameState(bbState);
+                fileLastModifiedDate = [attrs fileModificationDate];
+                NSLog(@"%@\t%@", [attrs fileModificationDate], fileLastModifiedDate);
+            }
         }
+        #endif
+        
+        update(0, bbState);
+        prepareTextBuffers(&bbState->textRenderer, (f32*)[vertBuffer contents], (u16*)[indexBuffer contents]);
+
+        Uniforms* ufms = (Uniforms*)[uniformBuffer contents];
+        id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
+
+        renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor: view.currentRenderPassDescriptor];
+        [renderEncoder setRenderPipelineState:pipelineState];
+
+        [renderEncoder setVertexBuffer:vertBuffer
+                            offset:0
+                            atIndex:0];
+        [renderEncoder setVertexBuffer:uniformBuffer
+                            offset:0
+                            atIndex:2];
+    
+        [renderEncoder setFragmentTexture:texture
+                        atIndex:0];
+        
+        [renderEncoder setFragmentSamplerState:samplerState atIndex: 0];
+
+        [renderEncoder drawIndexedPrimitives:MTLPrimitiveTypeTriangle
+                    indexCount: bbState->textRenderer.totalIndices
+                    indexType: MTLIndexTypeUInt16
+                    indexBuffer: indexBuffer
+                    indexBufferOffset: 0];
+
+        [renderEncoder endEncoding];
+        [commandBuffer presentDrawable:view.currentDrawable];
+       
         [commandBuffer commit];
         [view draw];
     }
