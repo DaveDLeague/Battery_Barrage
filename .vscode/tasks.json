@@ -14,7 +14,7 @@
         {
             "label": "build only",
             "type": "shell",
-            "command": "./build.sh",
+            "command": "./build.sh build",
             "group": {
                 "kind":"build",
                 "isDefault": true,

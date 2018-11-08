@@ -3,6 +3,9 @@
 #include <MetalKit/MetalKit.h>
 #include <GameController/GameController.h>
 #include <dlfcn.h>
+
+#include "common_utils.h"
+#include "renderer_metal.mm"
 #include "battery_barrage.cpp"
 
 #define WIDTH 900
@@ -28,72 +31,6 @@ void readFile(const s8* fileName, u8*& fileData, u64* fileLength){
     
     *fileLength = [data length];
     fileData = (u8*)[data bytes];
-}
-
-void prepareTextBuffers(TextRenderer* textRenderer, f32* vertBuffer, u16* indBuffer){
-    FontAtlas* fa = &textRenderer->fontAtlas;
-    f32 totalWidth = (f32)fa->totalBitmapWidth;
-    f32 totalHeight = (f32)fa->totalBitmapHeight;
-    u32 vCtr = 0;
-    u32 iCtr = 0;
-    u32 vertCount = 0;
-    for(int i = 0; i < textRenderer->totalTextObjects; i++){
-        TextObject* fo = &textRenderer->textObjects[i];
-
-        const s8* text = fo->text;
-        f32 xOff;
-        f32 yOff;
-        f32 width;
-        f32 height;
-        f32 xShift;
-        f32 yShift;
-        f32 scale = fo->scale;
-    
-        f32 xMarker = (f32)fo->x;
-        f32 y = (f32)fo->y;
-        s8 c = *text;
-        while(c != '\0'){
-            for(u32 j = 0; j < fa->totalCharacters; j++){
-                if(fa->characterCodes[j] == c){
-                    xOff = (f32)fa->xOffsets[j];
-                    yOff = (f32)fa->yOffsets[j];
-                    width = (f32)fa->widths[j];
-                    height = (f32)fa->heights[j];
-                    xShift = (f32)fa->xShifts[j];
-                    yShift = (f32)fa->yShifts[j];
-                    break;
-                }
-            }
-
-            if(c != ' '){
-                vertBuffer[vCtr++] = xMarker; vertBuffer[vCtr++] = y + (yShift * scale);
-                vertBuffer[vCtr++] = xOff / totalWidth; vertBuffer[vCtr++] = yOff / totalHeight;
-
-                vertBuffer[vCtr++] = xMarker; vertBuffer[vCtr++] = y + ((yShift + height) * scale);
-                vertBuffer[vCtr++] = xOff / totalWidth; vertBuffer[vCtr++] = (yOff + height) / totalHeight;
-
-                vertBuffer[vCtr++] = xMarker + (width * scale); vertBuffer[vCtr++] = y + ((yShift + height) * scale);
-                vertBuffer[vCtr++] = (xOff + width) / totalWidth; vertBuffer[vCtr++] = (yOff + height) / totalHeight;
-
-                vertBuffer[vCtr++] = xMarker + (width * scale); vertBuffer[vCtr++] = y + (yShift * scale);
-                vertBuffer[vCtr++] = (xOff + width) / totalWidth; vertBuffer[vCtr++] = yOff / totalHeight;
-                vertCount += 4;
-
-                indBuffer[iCtr++] = vertCount - 4;
-                indBuffer[iCtr++] = vertCount - 3;
-                indBuffer[iCtr++] = vertCount - 2;
-                indBuffer[iCtr++] = vertCount - 2;
-                indBuffer[iCtr++] = vertCount - 1;
-                indBuffer[iCtr++] = vertCount - 4;
-            }
-
-            xMarker += xShift * scale;
-            text++;
-            c = *text;
-        }
-    }
-    textRenderer->totalVertices = vertCount;
-    textRenderer->totalIndices = (vertCount / 4) * 6;
 }
 
 int main(int argc, char** argv){ 
@@ -139,6 +76,7 @@ int main(int argc, char** argv){
     unsigned int width, height;
     MTKView * view = [[MTKView alloc] initWithFrame: viewRect
                                              device: device];
+    
     if(!view){
         NSLog(@"Error initializing MTKView object\n");
     }
@@ -149,10 +87,10 @@ int main(int argc, char** argv){
     //METAL BUFFER SETUP
     float sz = 100;
     float vertices[] = {
-        0, 0,  0, 0,
-         0, sz,  0, 1,
-         sz, sz,   1, 1,
-         sz, 0,  1, 0,
+        0,  0,  0, 0,
+        0,  sz, 0, 1,
+        sz, sz, 1, 1,
+        sz, 0,  1, 0,
     };
 
     unsigned short indices[] = {
@@ -229,7 +167,6 @@ int main(int argc, char** argv){
         NSLog(@"Failed to created pipeline state, error %@", err);
         return 1;
     }
-
 
     BatteryBarrageState* bbState = new BatteryBarrageState;
     bbState->readFromFile = readFile;
@@ -309,7 +246,6 @@ int main(int argc, char** argv){
                 dlclose(handle);
                 handle = dlopen("./libbb.so", RTLD_LAZY);
                 update = (fnPtr)dlsym(handle, "updateGameState");
-                initializeGameState(bbState);
                 fileLastModifiedDate = [attrs fileModificationDate];
                 NSLog(@"%@\t%@", [attrs fileModificationDate], fileLastModifiedDate);
             }

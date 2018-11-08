@@ -1,5 +1,7 @@
 #pragma once
 
+#include "renderer.h"
+
 struct FontAtlas{
     u32 totalCharacters;
     u32 totalBitmapWidth;
