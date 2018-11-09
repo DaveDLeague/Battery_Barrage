@@ -8,22 +8,9 @@ enum RendererSubsystem {
     TOTAL_RENDERER_SUBSYSTEMS
 };
 
-enum RenderDataType {
-    RENDERER_DATA_TYPE_S8,
-    RENDERER_DATA_TYPE_S16,
-    RENDERER_DATA_TYPE_S32,
-    RENDERER_DATA_TYPE_S64,
-    RENDERER_DATA_TYPE_U8,
-    RENDERER_DATA_TYPE_U16,
-    RENDERER_DATA_TYPE_U32,
-    RENDERER_DATA_TYPE_U64,
-    RENDERER_DATA_TYPE_F32,
-    RENDERER_DATA_TYPE_F64,
-    RENDERER_DATA_TYPE_F32x2,
-    RENDERER_DATA_TYPE_F32x3,
-    RENDERER_DATA_TYPE_F32x4,
-
-    TOTAL_RENDER_DATA_TYPES
+enum RendererIndexType {
+    RENDERER_INDEX_TYPE_U16,
+    RENDERER_INDEX_TYPE_U32,
 };
 
 enum RendererVertexFormat {
@@ -86,7 +73,7 @@ struct Shader {
 struct VertexBufferDescriptor {
     u8 totalAttributes;
     RendererVertexFormat* rendererVertexFormats;
-    u32* attributeDimensions;
+    u32* attributeElementSizes;
     u32* attributeBufferOffsets; 
 };
 
@@ -98,6 +85,7 @@ struct RenderDevice {
                                   u32 bytesPerRow, 
                                   RendererPixelSize pixelSize, 
                                   u32 mipMapLevel, u32 index);
+    void (*createBuffer)(Buffer* buffer, u32 size, u32 index);
     void (*createBufferWithData)(Buffer* buffer, void* data, u32 size, u32 index);
     void (*createShaderFromString)(Shader* shader, 
                                    const char* shaderCode, 
@@ -106,11 +94,16 @@ struct RenderDevice {
                                    Buffer* vertexBuffer,
                                    VertexBufferDescriptor* vertBufDescriptor);
     void (*bindVertexBuffer)(Buffer* vertexBuffer);
+    void (*bindIndexBuffer)(Buffer* indexBuffer);
+    void (*bindVertexUniformBuffer)(Buffer* vertUniBuffer);
+    void (*bindFragmentUniformBuffer)(Buffer* fragUniBuffer);
     void (*bindShader)(Shader* shader);
     void (*bindTexture2D)(Texture2D* texture);
     void (*setTexture2DSamplerMode)(Texture2D* texture, TextureSamplerMode mode);
     void (*prepareRenderer)(void);
     void (*finalizeRenderer)(void);
     void (*drawVertices)(u32 startVertex, u32 vertexCount, RenderDrawMode mode);
+    void (*drawIndices)(u32 offset, u32 count, RendererIndexType type, RenderDrawMode mode);
     void (*setClearColor)(float r, float g, float b, float a);
+    void* (*getPointerToBufferData)(Buffer* b);
 };

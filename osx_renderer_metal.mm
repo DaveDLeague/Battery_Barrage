@@ -24,6 +24,11 @@ MTLPixelFormat metalPixelFormats[] = {
     MTLPixelFormatRGBA8Unorm,
 };
 
+MTLIndexType metalIndexTypes[] = {
+    MTLIndexTypeUInt16,
+    MTLIndexTypeUInt32
+};
+
 static id<MTLDevice> device;
 static id<MTLCommandQueue> commandQueue;
 static id<MTLCommandBuffer> commandBuffer;
@@ -35,6 +40,9 @@ static MTLTextureDescriptor* textureDescriptor;
 static MTKView * view;
 
 static Buffer* currentVertexBuffer;
+static Buffer* currentIndexBuffer;
+static Buffer* currentVertexUniformBuffer;
+static Buffer* currentFragmentUniformBuffer;
 static Shader* currentShader;
 static Texture2D* currentTexture2D;
 
@@ -49,7 +57,7 @@ void METALcreateTexture2DWithData(Texture2D* texture,
     textureDescriptor.height = height;
     textureDescriptor.pixelFormat = metalPixelFormats[pixelSize];
 
-    texture->texture2DData = (void*)[device newTextureWithDescriptor: textureDescriptor];
+    texture->texture2DData = [device newTextureWithDescriptor: textureDescriptor];
     MTLRegion region = {
         {0, 0, 0},
         { textureDescriptor.width , textureDescriptor.height, 1}
@@ -60,9 +68,15 @@ void METALcreateTexture2DWithData(Texture2D* texture,
                bytesPerRow:bytesPerRow];
 }
 
+void METALcreateBuffer(Buffer* buffer, u32 size, u32 index){
+    buffer->index = index;
+    buffer->bufferData = [device newBufferWithLength: size
+                                 options: MTLResourceStorageModeShared];
+}
+
 void METALcreateBufferWithData(Buffer* buffer, void* data, u32 dataSize, u32 index){
     buffer->index = index;
-    buffer->bufferData = (void*)[device newBufferWithBytes: data
+    buffer->bufferData = [device newBufferWithBytes: data
                                                  length: dataSize
                                                  options: MTLResourceStorageModeShared];
 }
@@ -77,7 +91,7 @@ void METALcreateShaderFromString(Shader* shader,
     NSString* string = [[NSString alloc] initWithCString: shaderCode
                                         encoding: NSUTF8StringEncoding];
     NSError* err = 0;
-    shader->shaderLibrary = (void*)[device newLibraryWithSource:string
+    shader->shaderLibrary = [device newLibraryWithSource:string
                                                         options: [[MTLCompileOptions alloc] init] 
                                                         error:&err];
                                                         
@@ -114,7 +128,7 @@ void METALcreateShaderFromString(Shader* shader,
         vertAttribDescriptor.offset = vertBufDescriptor->attributeBufferOffsets[i];
         vertAttribDescriptor.bufferIndex = vertexBuffer->index;
         [vertDescriptor.attributes setObject: vertAttribDescriptor atIndexedSubscript: i];
-        vertexBufferStride += sizeof(float) * vertBufDescriptor->attributeDimensions[i];
+        vertexBufferStride += vertBufDescriptor->attributeElementSizes[i] * (vertBufDescriptor->rendererVertexFormats[i] + 1);
     }
 
     MTLVertexBufferLayoutDescriptor *layoutDescriptor = [MTLVertexBufferLayoutDescriptor new];
@@ -140,6 +154,22 @@ void METALbindVertexBuffer(Buffer* vertexBuffer){
                         atIndex:currentVertexBuffer->index];
 }
 
+void METALbindIndexBuffer(Buffer* indexBuffer){
+    currentIndexBuffer = indexBuffer;
+}
+
+void METALbindVertexUniformBuffer(Buffer* vertUniBuffer){
+    [renderEncoder setVertexBuffer:(id<MTLBuffer>)vertUniBuffer->bufferData
+                            offset:0
+                            atIndex:vertUniBuffer->index];
+}
+
+void METALbindFragmentUniformBuffer(Buffer* vertFragBuffer){
+    [renderEncoder setFragmentBuffer:(id<MTLBuffer>)vertFragBuffer
+                            offset:0
+                            atIndex:vertFragBuffer->index];
+}
+
 void METALbindShader(Shader* shader){
     currentShader = shader;
     [renderEncoder setRenderPipelineState:(id<MTLRenderPipelineState>)currentShader->shaderPipelineState];
@@ -159,9 +189,17 @@ void METALprepareRenderer(){
 }
 
 void METALdrawVertices(u32 startVertex, u32 vertexCount, RenderDrawMode mode){
-        [renderEncoder drawPrimitives:metalPrimitiveTypes[mode]
-                        vertexStart:startVertex
-                        vertexCount:vertexCount];
+    [renderEncoder drawPrimitives:metalPrimitiveTypes[mode]
+                    vertexStart:startVertex
+                    vertexCount:vertexCount];
+}
+
+void METALdrawIndices(u32 offset, u32 count, RendererIndexType type, RenderDrawMode mode){
+    [renderEncoder drawIndexedPrimitives:metalPrimitiveTypes[mode]
+                    indexCount: count
+                    indexType: metalIndexTypes[type]
+                    indexBuffer: (id<MTLBuffer>)currentIndexBuffer->bufferData
+                    indexBufferOffset: offset];
 }
 
 void METALfinalizeRenderer(){
@@ -189,14 +227,18 @@ void METALsetTexture2DSamplerMode(Texture2D* texture, TextureSamplerMode mode){
     }
 }
 
-void initializeMetalRenderDevice(RenderDevice* renderDevice, NSWindow* window){
+void* METALgetPointerToBufferData(Buffer* buffer){
+    return [(id<MTLBuffer>)buffer->bufferData contents];
+}
+
+void initializeRenderDevice(RenderDevice* renderDevice, NSWindow* window){
     renderDevice->subsystem = RENDERER_SUBSYSTEM_METAL;
 
     device = MTLCreateSystemDefaultDevice();
     commandQueue = [device newCommandQueue];
     view = [[MTKView alloc] initWithFrame: NSMakeRect(0, 0, 
                                                         window.contentView.frame.size.width, 
-                                                        window.contentView.frame.size.width)
+                                                        window.contentView.frame.size.height)
                                                         device: device];
     if(!view){
         NSLog(@"Error initializing MTKView object\n");
@@ -217,14 +259,20 @@ void initializeMetalRenderDevice(RenderDevice* renderDevice, NSWindow* window){
     currentSamplerState = &nearestPointSamplerState;
 
     renderDevice->createTexture2DWithData = METALcreateTexture2DWithData;
+    renderDevice->createBuffer = METALcreateBuffer;
     renderDevice->createBufferWithData = METALcreateBufferWithData;
     renderDevice->createShaderFromString = METALcreateShaderFromString;
     renderDevice->bindVertexBuffer = METALbindVertexBuffer;
+    renderDevice->bindIndexBuffer = METALbindIndexBuffer;
+    renderDevice->bindVertexUniformBuffer = METALbindVertexUniformBuffer;
+    renderDevice->bindFragmentUniformBuffer = METALbindFragmentUniformBuffer;
     renderDevice->bindShader = METALbindShader;
     renderDevice->prepareRenderer = METALprepareRenderer;
     renderDevice->finalizeRenderer = METALfinalizeRenderer;
     renderDevice->drawVertices = METALdrawVertices;
+    renderDevice->drawIndices = METALdrawIndices;
     renderDevice->setClearColor = METALsetClearColor;
     renderDevice->setTexture2DSamplerMode = METALsetTexture2DSamplerMode;
     renderDevice->bindTexture2D = METALbindTexture2D;
+    renderDevice->getPointerToBufferData = METALgetPointerToBufferData;
 }
