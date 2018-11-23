@@ -1,15 +1,47 @@
 #include <Cocoa/Cocoa.h>
+#include <Carbon/Carbon.h> //for key codes
 #include <Metal/Metal.h>
 #include <MetalKit/MetalKit.h>
 #include <GameController/GameController.h>
 #include <dlfcn.h>
 
 #include "common_utils.h"
-#include "renderer_metal.mm"
+#include "graphics_math.cpp"
+#include "osx_renderer_metal.mm"
+
+#include "os.h"
+
+#include "text_renderer.cpp"
+#include "terrain_renderer.cpp"
+
 #include "battery_barrage.cpp"
 
-#define WIDTH 900
-#define HEIGHT 500
+#define WIDTH 1280
+#define HEIGHT 720
+
+OSDevice osDevice;
+RenderDevice renderDevice = {};
+TextObjectManager txtObjMgr = {};
+TextRenderer textRenderer = {};
+
+void OSXreadBinaryFile(const s8* fileName, u8** fileData, u64* fileLength){
+    NSString* string = [[NSString alloc] initWithUTF8String: fileName];
+    NSData* data = [NSData dataWithContentsOfFile: string];
+    
+    *fileLength = [data length];
+    *fileData = (u8*)[data bytes];
+}
+
+void OSXreadTextFile(const s8* fileName, s8** fileData, u64* fileLength){
+    NSError* err;
+    NSString* fl = [[NSString alloc] initWithUTF8String: fileName];
+    NSString* string = [NSString stringWithContentsOfFile: fl
+                                        encoding: NSUTF8StringEncoding
+                                        error: &err];
+    
+    *fileLength = [string length];
+    *fileData = (s8*)[string UTF8String];
+}
 
 @class WindowDelegate;
 @interface WindowDelegate : NSView <NSWindowDelegate> {
@@ -24,17 +56,19 @@
 }
 @end
 
-void readFile(const s8* fileName, u8*& fileData, u64* fileLength){
-    NSString* string = [[NSString alloc] initWithCString: fileName
+void OSXdisplayMessageBox(const char* message){
+    NSString* string = [[NSString alloc] initWithCString: message
                                         encoding: NSUTF8StringEncoding];
-    NSData* data = [NSData dataWithContentsOfFile: string];
-    
-    *fileLength = [data length];
-    fileData = (u8*)[data bytes];
+    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+    [alert setMessageText:string];
+    [alert runModal];
 }
 
 int main(int argc, char** argv){ 
-    
+
+    osDevice.readBinaryFile = OSXreadBinaryFile;
+    osDevice.readTextFile = OSXreadTextFile;
+
     NSAutoreleasePool * pool = [[NSAutoreleasePool alloc] init]; 
     [NSApp sharedApplication];
 
@@ -53,7 +87,7 @@ int main(int argc, char** argv){
 	NSWindow * window = [[NSWindow alloc] initWithContentRect:windowRect 
 						styleMask:windowStyle 
 						backing:NSBackingStoreBuffered 
-						defer:NO]; 
+						defer:false]; 
 	[window autorelease]; 
  
 	NSWindowController * windowController = [[NSWindowController alloc] initWithWindow:window]; 
@@ -63,172 +97,46 @@ int main(int argc, char** argv){
     [delegate autorelease];
     [window setDelegate:delegate];
     [window setTitle:[[NSProcessInfo processInfo] processName]];
-    [window setAcceptsMouseMovedEvents:YES];
+    [window setAcceptsMouseMovedEvents:true];
     [window setCollectionBehavior: NSWindowCollectionBehaviorFullScreenPrimary];
 	[window orderFrontRegardless];  
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
-    [NSApp activateIgnoringOtherApps:YES];
+    [NSApp activateIgnoringOtherApps:true];
 
-    //METAL DEVICE SETUP
-    id<MTLDevice> device = MTLCreateSystemDefaultDevice();
-    id<MTLCommandQueue> commandQueue = [device newCommandQueue];
-    id<MTLRenderCommandEncoder> renderEncoder;
-    unsigned int width, height;
-    MTKView * view = [[MTKView alloc] initWithFrame: viewRect
-                                             device: device];
-    
-    if(!view){
-        NSLog(@"Error initializing MTKView object\n");
-    }
-    view.clearColor = MTLClearColorMake(0.2, 0.5, 0.8, 1);
-    view.paused = true;
-    view.enableSetNeedsDisplay = false;
+    initializeRenderDevice(&renderDevice, window);
+    renderDevice.setClearColor(0.0, 0.6, 1, 1);
 
-    //METAL BUFFER SETUP
-    float sz = 100;
-    float vertices[] = {
-        0,  0,  0, 0,
-        0,  sz, 0, 1,
-        sz, sz, 1, 1,
-        sz, 0,  1, 0,
-    };
-
-    unsigned short indices[] = {
-        0, 1, 2, 2, 3, 0
-    };
-
-    struct Uniforms {
-        Matrix4 perspectiveMatrix;
-    };
-    Uniforms uniforms = {};
-    
-    uniforms.perspectiveMatrix = createOrthogonalProjectionMatrix(0, WIDTH, 0, HEIGHT, -1, 1);
-    
-    // id<MTLBuffer> indexBuffer = [device newBufferWithBytes: indices
-    //                                     length: sizeof(indices)
-    //                                     options: MTLResourceStorageModeShared];
-    // id<MTLBuffer> vertBuffer = [device newBufferWithBytes: vertices
-    //                                     length: sizeof(vertices)
-    //                                     options: MTLResourceStorageModeShared];
-    id<MTLBuffer> indexBuffer = [device newBufferWithLength: 10000
-                                        options: MTLResourceStorageModeShared];
-    id<MTLBuffer> vertBuffer = [device newBufferWithLength: 10000
-                                        options: MTLResourceStorageModeShared];
-
-
-    id<MTLBuffer> uniformBuffer = [device newBufferWithBytes: &uniforms
-                                        length: sizeof(uniforms)
-                                        options: MTLResourceStorageModeShared];
-    MTLVertexDescriptor *vertDescriptor = [MTLVertexDescriptor vertexDescriptor];
-    
-    MTLVertexAttributeDescriptor *attribDescriptor = [MTLVertexAttributeDescriptor new];
-    attribDescriptor.format = MTLVertexFormatFloat2;
-    attribDescriptor.offset = 0;
-    attribDescriptor.bufferIndex = 0;
-    [vertDescriptor.attributes setObject: attribDescriptor atIndexedSubscript: 0];
-    MTLVertexAttributeDescriptor *texDescriptor = [MTLVertexAttributeDescriptor new];
-    attribDescriptor.format = MTLVertexFormatFloat2;
-    attribDescriptor.offset = sizeof(float) * 2;
-    attribDescriptor.bufferIndex = 0;
-    [vertDescriptor.attributes setObject: attribDescriptor atIndexedSubscript: 1];
-    
-    MTLVertexBufferLayoutDescriptor *layoutDescriptor = [MTLVertexBufferLayoutDescriptor new];
-    layoutDescriptor.stride = sizeof(float) * 4;
-    layoutDescriptor.stepFunction = MTLVertexStepFunctionPerVertex;
-    layoutDescriptor.stepRate = 1;
-    [vertDescriptor.layouts setObject: layoutDescriptor atIndexedSubscript: 0];
-
-    //METAL SHADER SETUP
-    id<MTLRenderPipelineState> pipelineState;
-    NSError* err;
-    id<MTLLibrary> defaultLibrary = [device newLibraryWithFile:@"basic_shader.metallib" error: &err];
-    // MTLCompileOptions* options = [[MTLCompileOptions alloc] init];
-    // id<MTLLibrary> defaultLibrary = [device newLibraryWithSource:shaders
-    //                                                     options: options 
-    //                                                     error:&err];
-    id<MTLFunction> vertexFunction = [defaultLibrary newFunctionWithName:@"vertexShader"];
-    id<MTLFunction> fragmentFunction = [defaultLibrary newFunctionWithName:@"fragmentShader"];
-
-    MTLRenderPipelineDescriptor *pipelineStateDescriptor = [[MTLRenderPipelineDescriptor alloc] init];
-    pipelineStateDescriptor.vertexFunction = vertexFunction;
-    pipelineStateDescriptor.fragmentFunction = fragmentFunction;
-    pipelineStateDescriptor.colorAttachments[0].pixelFormat = view.colorPixelFormat;
-    pipelineStateDescriptor.colorAttachments[0].blendingEnabled = YES;
-    pipelineStateDescriptor.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
-    pipelineStateDescriptor.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
-    pipelineStateDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
-    pipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
-    pipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-    pipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-    pipelineStateDescriptor.vertexDescriptor = vertDescriptor;
-
-    pipelineState = [device newRenderPipelineStateWithDescriptor:pipelineStateDescriptor error:&err];
-    if (!pipelineState){
-        NSLog(@"Failed to created pipeline state, error %@", err);
-        return 1;
-    }
-
-    BatteryBarrageState* bbState = new BatteryBarrageState;
-    bbState->readFromFile = readFile;
-    bbState->gameWidth = WIDTH;
-    bbState->gameHeight = HEIGHT;
-    initializeGameState(bbState);
-
-    prepareTextBuffers(&bbState->textRenderer, (f32*)[vertBuffer contents], (u16*)[indexBuffer contents]);
-
-    //METAL TEXTURE SETUP
-    unsigned char textureData[] = {
-        0, 0, 255, 255,     255, 0, 0, 255,     0, 255, 0, 255,
-        0, 255, 0, 255,     0, 0, 255, 255,     255, 0, 0, 255,
-        255, 0, 0, 255,     0, 255, 0, 255,     0, 0, 255, 255,     
-    };
-
-    MTLTextureDescriptor *textureDescriptor = [[MTLTextureDescriptor alloc] init];
-    textureDescriptor.width = bbState->textRenderer.fontAtlas.totalBitmapWidth;
-    textureDescriptor.height = bbState->textRenderer.fontAtlas.totalBitmapHeight;
-    textureDescriptor.pixelFormat = MTLPixelFormatR8Unorm;
-    id<MTLTexture> texture = [device newTextureWithDescriptor: textureDescriptor];
-    MTLRegion region = {
-        {0, 0, 0},
-        { textureDescriptor.width , textureDescriptor.height, 1}
-    };
-    [texture replaceRegion:region
-               mipmapLevel:0
-               withBytes:bbState->textRenderer.fontAtlas.bitmap
-               bytesPerRow:bbState->textRenderer.fontAtlas.totalBitmapWidth];
-
-    MTLSamplerDescriptor *samplerDescriptor = [MTLSamplerDescriptor new];
-    samplerDescriptor.minFilter = MTLSamplerMinMagFilterNearest;
-    samplerDescriptor.magFilter = MTLSamplerMinMagFilterNearest;
-    id<MTLSamplerState> samplerState = [device newSamplerStateWithDescriptor: samplerDescriptor];
-
-    [window setContentView:view];
+    initializeTextRenderer(&osDevice, &renderDevice, &textRenderer);
+    setTextRendererProjection(&textRenderer, 0, WIDTH, 0, HEIGHT);
 
     void* handle = dlopen("./libbb.so", RTLD_LAZY);
     typedef void (*fnPtr)(float, BatteryBarrageState*);
     fnPtr update = (fnPtr)dlsym(handle, "updateGameState");
 
-
     NSString * path = @"./libbb.so";
-    NSDate * fileLastModifiedDate = nil;
+    NSDate * fileLastModifiedDate = 0;
 
-    NSError * error = nil;
+    NSError * error = 0;
     NSDictionary * attrs = [[NSFileManager defaultManager] attributesOfItemAtPath:path error:&error];
     if (attrs && !error){
         fileLastModifiedDate = [attrs fileModificationDate];
     }
 
+    TextObject* tobj = createTextObject(&txtObjMgr, "HEL LO", 100, 100, 0.7, Vector4(1, 0, 0, 1));
+    TextObject* tobj2 = createTextObject(&txtObjMgr, "@ @@ @@@@", 200, 200, 1, Vector4(1, 1, 1, 0.5));
+    TextObject* tobj3 = createTextObject(&txtObjMgr, "+35T #$", 200, 400, 1, Vector4(0, 0, 1, 0.25));
+
     NSEvent* ev;  
     while(true){
         do {
             ev = [NSApp nextEventMatchingMask: NSEventMaskAny
-                                    untilDate: nil
+                                    untilDate: 0
                                        inMode: NSDefaultRunLoopMode
-                                      dequeue: YES];
+                                      dequeue: true];
             if (ev) {
                 if([ev type] == NSEventTypeKeyDown){
                     switch([ev keyCode]){
-                        case 53:{
+                        case kVK_Escape:{
                             [NSApp terminate: NSApp];
                             break;
                         }
@@ -251,39 +159,12 @@ int main(int argc, char** argv){
             }
         }
         #endif
-        
-        update(0, bbState);
-        prepareTextBuffers(&bbState->textRenderer, (f32*)[vertBuffer contents], (u16*)[indexBuffer contents]);
 
-        Uniforms* ufms = (Uniforms*)[uniformBuffer contents];
-        id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
-
-        renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor: view.currentRenderPassDescriptor];
-        [renderEncoder setRenderPipelineState:pipelineState];
-
-        [renderEncoder setVertexBuffer:vertBuffer
-                            offset:0
-                            atIndex:0];
-        [renderEncoder setVertexBuffer:uniformBuffer
-                            offset:0
-                            atIndex:2];
-    
-        [renderEncoder setFragmentTexture:texture
-                        atIndex:0];
-        
-        [renderEncoder setFragmentSamplerState:samplerState atIndex: 0];
-
-        [renderEncoder drawIndexedPrimitives:MTLPrimitiveTypeTriangle
-                    indexCount: bbState->textRenderer.totalIndices
-                    indexType: MTLIndexTypeUInt16
-                    indexBuffer: indexBuffer
-                    indexBufferOffset: 0];
-
-        [renderEncoder endEncoding];
-        [commandBuffer presentDrawable:view.currentDrawable];
-       
-        [commandBuffer commit];
-        [view draw];
+        renderDevice.prepareRenderer();
+        prepareTextRenderer(&textRenderer);
+        renderTextObjects(&textRenderer, &txtObjMgr);
+        finalizeTextRenderer(&textRenderer);
+        renderDevice.finalizeRenderer();
     }
 
 	[pool drain]; 

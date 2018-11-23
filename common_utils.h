@@ -13,7 +13,9 @@ typedef double f64;
 
 #ifdef DEBUG_COMPILE
     #define DEBUG_PRINT(X...) NSLog(@X) 
+    #define ASSERT(X) if(!(X)) { exit(1); }
 #else   
     #define DEBUG_PRINT(X...)
+    #define ASSERT(X) 
 #endif
 

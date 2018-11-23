@@ -1,6 +1,12 @@
 #include "text_renderer.h"
 
-void loadFontAtlas(unsigned char* fileData, FontAtlas* fa){
+void setTextRendererProjection(TextRenderer* textRenderer, float left, float right, float bottom, float top){
+    Matrix4 perspMat = createOrthogonalProjectionMatrix(left, right, bottom, top, -1, 1);
+    TextUniforms* unis = (TextUniforms*)textRenderer->renderDevice->getPointerToBufferData(&textRenderer->uniformBuffer);
+    unis->perspectiveMatrix = perspMat;
+}
+
+void loadCharacterAtlas(unsigned char* fileData, CharacterAtlas* fa){
     fa->totalCharacters = *(unsigned int*)fileData;
     fileData += sizeof(unsigned int);
     fa->totalBitmapWidth = *(unsigned int*)fileData;
@@ -50,102 +56,167 @@ void loadFontAtlas(unsigned char* fileData, FontAtlas* fa){
     }
 }
 
-TextObject* createTextObject(TextRenderer* textRenderer, const s8* text, float x, float y, float scale){
-    TextObject* tObj = &textRenderer->textObjects[textRenderer->totalTextObjects];
+TextObject* createTextObject(TextObjectManager* tomgr, const s8* text, f32 x, f32 y, f32 scale = 1, Vector4 color = Vector4(0, 0, 0, 1)){
+    ASSERT(tomgr->totalTextObjects < TextObjectManager::MAX_TEXT_OBJECTS);
 
-    u32 len = 0;
-    while(true){
-        tObj->text[len] = text[len];
-        if(text[len++] == '\0'){
-            break;
-        }
+    s8 c;
+    u32 totalChars = 0;
+    u32 totalTextObjects = tomgr->totalTextObjects;
+    TextObject* tobj = &tomgr->textObjects[totalTextObjects];
+    do{
+        c = text[totalChars];
+        ASSERT(totalChars < TextObject::MAX_STRING_LENGTH);
+        tobj->text[totalChars] = c;
+        totalChars++;
     }
-    
-    tObj->fontAtlas = &textRenderer->fontAtlas;
-    
-    tObj->textLength = len;
-    tObj->scale = scale;
-    tObj->x = x;
-    tObj->y = y;
-    
-    textRenderer->totalTextObjects++;
-   
-    return tObj;
+    while(c != '\0');
+
+    tobj->textLength = totalChars;
+    tobj->x = x;
+    tobj->y = y;
+    tobj->scale = scale;
+    tobj->color = color;
+    tobj->index = totalTextObjects;
+
+    tomgr->totalTextObjects++;
+
+    return tobj;
 }
 
-void setTextObjectText(TextObject* txtObj, const s8* text, ...){
-    u32 len = 0;
-    while(true){
-        txtObj->text[len] = text[len];
-        if(text[len++] == '\0'){
-            break;
-        }
-    }
-    txtObj->textLength = len;
+void prepareTextRenderer(TextRenderer* textRenderer){
+    RenderDevice* device = textRenderer->renderDevice;
+    device->bindShader(&textRenderer->shader);
+    device->bindTexture2D(&textRenderer->characterAtlasTexture);
+    device->bindVertexBuffer(&textRenderer->vertexBuffer);
+    device->bindIndexBuffer(&textRenderer->indexBuffer);
+    device->bindVertexUniformBuffer(&textRenderer->uniformBuffer);
+    textRenderer->totalVertices = 0;
+    textRenderer->totalIndices = 0;
 }
 
-void prepareTextBuffers(TextRenderer* textRenderer, f32* vertBuffer, u16* indBuffer){
-    FontAtlas* fa = &textRenderer->fontAtlas;
-    f32 totalWidth = (f32)fa->totalBitmapWidth;
-    f32 totalHeight = (f32)fa->totalBitmapHeight;
-    u32 vCtr = 0;     
-    u32 iCtr = 0;
-    u32 vertCount = 0;
-    for(int i = 0; i < textRenderer->totalTextObjects; i++){
-        TextObject* fo = &textRenderer->textObjects[i];
+void renderTextObjects(TextRenderer* textRenderer, TextObjectManager* txtObjMgr){
+    RenderDevice* device = textRenderer->renderDevice;
 
-        const s8* text = fo->text;
-        f32 xOff;
-        f32 yOff;
-        f32 width;
-        f32 height;
-        f32 xShift;
-        f32 yShift;
-        f32 scale = fo->scale;
-    
-        f32 xMarker = (f32)fo->x;
-        f32 y = (f32)fo->y;
-        s8 c = *text;
-        while(c != '\0'){
-            for(u32 j = 0; j < fa->totalCharacters; j++){
-                if(fa->characterCodes[j] == c){
-                    xOff = (f32)fa->xOffsets[j];
-                    yOff = (f32)fa->yOffsets[j];
-                    width = (f32)fa->widths[j];
-                    height = (f32)fa->heights[j];
-                    xShift = (f32)fa->xShifts[j];
-                    yShift = (f32)fa->yShifts[j];
+    u32 totalTextObjects = txtObjMgr->totalTextObjects;
+    CharacterAtlas* charAtls = &textRenderer->charAtlas;
+    u32 vertCt = textRenderer->totalVertices * 8;
+    u32 indCt = textRenderer->totalIndices * 6;
+    for(u32 i = 0; i < totalTextObjects; i++){
+        TextObject* txtObj = &txtObjMgr->textObjects[i];
+
+        TextUniforms* unis = (TextUniforms*)device->getPointerToBufferData(&textRenderer->uniformBuffer);
+        unis->colors[i] = txtObj->color;
+
+        u32 totalChars = txtObj->textLength;
+        f32 xMarker = txtObj->x;
+        f32 yMarker = txtObj->y;
+        for(u32 j = 0; j < totalChars; j++){
+            s8 c = txtObj->text[j];
+            u32 totalChars = charAtls->totalCharacters;
+            u32 k;
+            for(k = 0; k < totalChars; k++){
+                if(c == charAtls->characterCodes[k]){
                     break;
                 }
             }
 
-            if(c != ' '){
-                vertBuffer[vCtr++] = xMarker; vertBuffer[vCtr++] = y + (yShift * scale);
-                vertBuffer[vCtr++] = xOff / totalWidth; vertBuffer[vCtr++] = yOff / totalHeight;
-
-                vertBuffer[vCtr++] = xMarker; vertBuffer[vCtr++] = y + ((yShift + height) * scale);
-                vertBuffer[vCtr++] = xOff / totalWidth; vertBuffer[vCtr++] = (yOff + height) / totalHeight;
-
-                vertBuffer[vCtr++] = xMarker + (width * scale); vertBuffer[vCtr++] = y + ((yShift + height) * scale);
-                vertBuffer[vCtr++] = (xOff + width) / totalWidth; vertBuffer[vCtr++] = (yOff + height) / totalHeight;
-
-                vertBuffer[vCtr++] = xMarker + (width * scale); vertBuffer[vCtr++] = y + (yShift * scale);
-                vertBuffer[vCtr++] = (xOff + width) / totalWidth; vertBuffer[vCtr++] = yOff / totalHeight;
-                vertCount += 4;
-
-                indBuffer[iCtr++] = vertCount - 4;
-                indBuffer[iCtr++] = vertCount - 3;
-                indBuffer[iCtr++] = vertCount - 2;
-                indBuffer[iCtr++] = vertCount - 2;
-                indBuffer[iCtr++] = vertCount - 1;
-                indBuffer[iCtr++] = vertCount - 4;
+            f32 scale = txtObj->scale;
+             if(c == ' '){
+                xMarker += charAtls->xShifts[k] * scale;
+                continue;
             }
+            
+            f32 width = charAtls->widths[k];
+            f32 height = charAtls->heights[k];
+            f32 xOff = charAtls->xOffsets[k];
+            f32 yOff = charAtls->yOffsets[k];
+            f32 bitmapWidth = charAtls->totalBitmapWidth;
+            f32 bitmapHeight = charAtls->totalBitmapHeight;
 
-            xMarker += xShift * scale;
-            text++;
-            c = *text;
+
+            f32 left = xMarker;
+            f32 right = xMarker + width * scale;
+            f32 bottom = yMarker + charAtls->yShifts[k] * scale;
+            f32 top = yMarker + height * scale;
+            f32 tLeft = xOff / bitmapWidth;
+            f32 tRight = (xOff + width) / bitmapWidth;
+            f32 tBottom = yOff / bitmapHeight;
+            f32 tTop = (yOff + height) / bitmapHeight;
+
+            f32* vertPtr = (f32*)device->getPointerToBufferData(&textRenderer->vertexBuffer);
+            u16* indPtr = (u16*)device->getPointerToBufferData(&textRenderer->indexBuffer);
+            vertPtr[vertCt++] = left;  vertPtr[vertCt++] =  bottom;
+            vertPtr[vertCt++] = tLeft; vertPtr[vertCt++] = tBottom;
+            vertPtr[vertCt++] = i;
+            vertPtr[vertCt++] = left;  vertPtr[vertCt++] =  top;
+            vertPtr[vertCt++] = tLeft; vertPtr[vertCt++] = tTop;
+            vertPtr[vertCt++] = i;
+            vertPtr[vertCt++] = right;  vertPtr[vertCt++] =  top;
+            vertPtr[vertCt++] = tRight; vertPtr[vertCt++] = tTop;
+            vertPtr[vertCt++] = i;
+            vertPtr[vertCt++] = right;  vertPtr[vertCt++] =  bottom;
+            vertPtr[vertCt++] = tRight; vertPtr[vertCt++] = tBottom;
+            vertPtr[vertCt++] = i;
+            textRenderer->totalVertices += 4;
+            
+            indPtr[indCt++] = textRenderer->totalVertices - 4;
+            indPtr[indCt++] = textRenderer->totalVertices - 3;
+            indPtr[indCt++] = textRenderer->totalVertices - 2;
+            indPtr[indCt++] = textRenderer->totalVertices - 2;
+            indPtr[indCt++] = textRenderer->totalVertices - 1;
+            indPtr[indCt++] = textRenderer->totalVertices - 4;
+            textRenderer->totalIndices += 6;
+            xMarker += charAtls->xShifts[k] * scale;
         }
     }
-    textRenderer->totalVertices = vertCount;
-    textRenderer->totalIndices = (vertCount / 4) * 6;
+}
+
+void finalizeTextRenderer(TextRenderer* textRenderer){
+    textRenderer->renderDevice->drawIndices(0, textRenderer->totalIndices, RENDERER_INDEX_TYPE_U16, RENDER_DRAW_MODE_TRIANGLES);
+}
+
+void initializeTextRenderer(OSDevice* osDevice, RenderDevice* renderDevice, TextRenderer* textRenderer){
+    textRenderer->osDevice = osDevice;
+    textRenderer->renderDevice = renderDevice;
+
+    u8* fontFileData;
+    u64 len;
+    osDevice->readBinaryFile("./font atlas builder/times_new_roman.fontatlas", &fontFileData, &len);
+    loadCharacterAtlas(fontFileData, &textRenderer->charAtlas);
+
+    renderDevice->createBuffer(&textRenderer->vertexBuffer, TextRenderer::MAX_VERTICES, 0);
+    renderDevice->createBuffer(&textRenderer->indexBuffer, TextRenderer::MAX_INDICES, 1);
+    renderDevice->createBuffer(&textRenderer->uniformBuffer, sizeof(TextUniforms), 2);
+    renderDevice->createTexture2DWithData(&textRenderer->characterAtlasTexture, textRenderer->charAtlas.bitmap, textRenderer->charAtlas.totalBitmapWidth, textRenderer->charAtlas.totalBitmapHeight, textRenderer->charAtlas.totalBitmapWidth, RENDERER_PIXEL_SIZE_R8, 0, 0);
+
+    RendererVertexFormat rvf[] = {
+        RENDERER_VERTEX_FORMAT_F32x2, RENDERER_VERTEX_FORMAT_F32x2, RENDERER_VERTEX_FORMAT_F32
+    };
+    u32 elemSizes[] = {
+        sizeof(float), sizeof(float), sizeof(float)
+    };
+    u32 bufOffs[] = {
+        0, sizeof(float) * 2, sizeof(float) * 4
+    };
+    VertexBufferDescriptor vbd;
+    vbd.totalAttributes = 3;
+    vbd.rendererVertexFormats = rvf;
+    vbd.attributeElementSizes = elemSizes;
+    vbd.attributeBufferOffsets = bufOffs;
+
+    s8* shaderText;
+    u64 fileLength;
+    osDevice->readTextFile("text_shader.metal", &shaderText, &fileLength);
+
+    renderDevice->createShaderFromString(&textRenderer->shader, (const char*)shaderText, "vertexShader", "fragmentShader", &textRenderer->vertexBuffer, &vbd);
+    renderDevice->bindShader(&textRenderer->shader);
+    renderDevice->bindVertexBuffer(&textRenderer->vertexBuffer);
+    renderDevice->bindVertexUniformBuffer(&textRenderer->uniformBuffer);
+    renderDevice->enableBlending(true);
+
+    renderDevice->createTexture2DWithData(&textRenderer->characterAtlasTexture, textRenderer->charAtlas.bitmap, 
+                                                   textRenderer->charAtlas.totalBitmapWidth, 
+                                                   textRenderer->charAtlas.totalBitmapHeight, 
+                                                   textRenderer->charAtlas.totalBitmapWidth, RENDERER_PIXEL_SIZE_R8, 0, 0);
+
 }

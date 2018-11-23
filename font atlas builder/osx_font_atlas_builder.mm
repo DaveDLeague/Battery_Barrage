@@ -11,7 +11,7 @@ struct FontAtlas{
     unsigned int* xOffsets;
     unsigned int* yOffsets;
     unsigned int* widths;
-    unsigned int* heights;
+    unsigned int* heights; 
     float* xShifts;
     float* yShifts;
 };
@@ -210,9 +210,6 @@ void buildFontAtlas(FontAtlas* fa, unsigned char* fontFileData, unsigned int tot
     Bitmap* bitmaps = new Bitmap[totalCharacters];
     
     for(int i = 0; i < totalCharacters; i++){
-        if(charCodes[i] == ' '){
-            continue;
-        }
         unsigned int w, h;
         float ho, v;
         unsigned char* dats = getReducedBitmapFromCharCode(fontFileData, charCodes[i], &w, &h, &ho, &v, divisions);
@@ -244,7 +241,7 @@ void buildFontAtlas(FontAtlas* fa, unsigned char* fontFileData, unsigned int tot
     fa->xOffsets = new unsigned int[totalAcceptedChars];
     fa->yOffsets = new unsigned int[totalAcceptedChars];
     fa->xShifts = new float[totalAcceptedChars];
-    fa->yShifts = new float[totalAcceptedChars];
+    fa->yShifts = new float[totalAcceptedChars]; 
     fa->characterCodes = new unsigned short[totalAcceptedChars];  
 
     unsigned int totalWidth = 0;

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "graphics_math.h"
+
 enum RendererSubsystem {
     RENDERER_SUBSYSTEM_METAL,
     RENDERER_SUBSYSTEM_DX11,
@@ -60,7 +62,7 @@ struct Texture2D {
     void* textureSamplerDescriptor;
 };
 
-struct Buffer {
+struct RenderBuffer {
     u32 index;
     void* bufferData;
 };
@@ -85,18 +87,25 @@ struct RenderDevice {
                                   u32 bytesPerRow, 
                                   RendererPixelSize pixelSize, 
                                   u32 mipMapLevel, u32 index);
-    void (*createBuffer)(Buffer* buffer, u32 size, u32 index);
-    void (*createBufferWithData)(Buffer* buffer, void* data, u32 size, u32 index);
+    void (*createBuffer)(RenderBuffer* buffer, u32 size, u32 index);
+    void (*createBufferWithData)(RenderBuffer* buffer, void* data, u32 size, u32 index);
     void (*createShaderFromString)(Shader* shader, 
                                    const char* shaderCode, 
                                    const char* vertexFunctionName, 
                                    const char* fragmentFunctionName,
-                                   Buffer* vertexBuffer,
+                                   RenderBuffer* vertexBuffer,
                                    VertexBufferDescriptor* vertBufDescriptor);
-    void (*bindVertexBuffer)(Buffer* vertexBuffer);
-    void (*bindIndexBuffer)(Buffer* indexBuffer);
-    void (*bindVertexUniformBuffer)(Buffer* vertUniBuffer);
-    void (*bindFragmentUniformBuffer)(Buffer* fragUniBuffer);
+    void (*createShaderFromPrecompiledBinary)(Shader* shader, 
+                                              const void* shaderBinary,
+                                              u32 binaryLength, 
+                                              const char* vertexFunctionName, 
+                                              const char* fragmentFunctionName,
+                                              RenderBuffer* vertexBuffer,
+                                              VertexBufferDescriptor* vertBufDescriptor);
+    void (*bindVertexBuffer)(RenderBuffer* vertexBuffer);
+    void (*bindIndexBuffer)(RenderBuffer* indexBuffer);
+    void (*bindVertexUniformBuffer)(RenderBuffer* vertUniBuffer);
+    void (*bindFragmentUniformBuffer)(RenderBuffer* fragUniBuffer);
     void (*bindShader)(Shader* shader);
     void (*bindTexture2D)(Texture2D* texture);
     void (*setTexture2DSamplerMode)(Texture2D* texture, TextureSamplerMode mode);
@@ -105,5 +114,6 @@ struct RenderDevice {
     void (*drawVertices)(u32 startVertex, u32 vertexCount, RenderDrawMode mode);
     void (*drawIndices)(u32 offset, u32 count, RendererIndexType type, RenderDrawMode mode);
     void (*setClearColor)(float r, float g, float b, float a);
-    void* (*getPointerToBufferData)(Buffer* b);
+    void (*enableBlending)(bool enabled);
+    void* (*getPointerToBufferData)(RenderBuffer* b);
 };

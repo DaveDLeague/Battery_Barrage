@@ -1,3 +1,5 @@
+#pragma once
+
 #include "common_utils.h"
 #include "graphics_math.h"
 #include "text_renderer.h"

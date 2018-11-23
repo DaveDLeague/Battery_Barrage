@@ -1,8 +1,14 @@
 #pragma once
 
+#include "os.h"
 #include "renderer.h"
 
-struct FontAtlas{
+struct TextUniforms {
+    Matrix4 perspectiveMatrix;
+    Vector4 colors[256];
+};
+
+struct CharacterAtlas {
     u32 totalCharacters;
     u32 totalBitmapWidth;
     u32 totalBitmapHeight;
@@ -16,22 +22,34 @@ struct FontAtlas{
     f32* yShifts;
 };
 
-struct TextObject{
-    static const u16 MAX_STRING_LENGTH = 256;
-    FontAtlas* fontAtlas;
-    s8 text[MAX_STRING_LENGTH];
-    u16 textLength;
+struct TextObject {
+    static const u32 MAX_STRING_LENGTH = 256;
+    u32 index;
+    u32 textLength;
     f32 scale;
     f32 x;
     f32 y;
+    Vector4 color;
+    s8 text[MAX_STRING_LENGTH];
 };
 
-struct TextRenderer{
-    static const u16 MAX_TEXT_OBJECTS = 65535;
-    FontAtlas fontAtlas;
-    TextObject textObjects[MAX_TEXT_OBJECTS];
-    Matrix4 viewProjection;
+struct TextObjectManager {
+    static const u32 MAX_TEXT_OBJECTS = 256;
     u32 totalTextObjects;
+    TextObject textObjects[MAX_TEXT_OBJECTS];
+};
+
+struct TextRenderer {
+    static const u32 MAX_VERTICES = 65536;
+    static const u32 MAX_INDICES = (MAX_VERTICES / 4) * 6;
+    OSDevice* osDevice;
+    RenderDevice* renderDevice;
+    RenderBuffer vertexBuffer;
+    RenderBuffer indexBuffer;
+    RenderBuffer uniformBuffer;
+    Shader shader;
+    Texture2D characterAtlasTexture;
+    CharacterAtlas charAtlas;
     u32 totalVertices;
     u32 totalIndices;
 };

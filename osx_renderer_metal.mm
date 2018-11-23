@@ -37,12 +37,13 @@ static id<MTLSamplerState> linearSamplerState;
 static id<MTLSamplerState> nearestPointSamplerState;
 static id<MTLSamplerState>* currentSamplerState;
 static MTLTextureDescriptor* textureDescriptor;
+static MTLRenderPipelineDescriptor *pipelineStateDescriptor;
 static MTKView * view;
 
-static Buffer* currentVertexBuffer;
-static Buffer* currentIndexBuffer;
-static Buffer* currentVertexUniformBuffer;
-static Buffer* currentFragmentUniformBuffer;
+static RenderBuffer* currentVertexBuffer;
+static RenderBuffer* currentIndexBuffer;
+static RenderBuffer* currentVertexUniformBuffer;
+static RenderBuffer* currentFragmentUniformBuffer;
 static Shader* currentShader;
 static Texture2D* currentTexture2D;
 
@@ -68,13 +69,13 @@ void METALcreateTexture2DWithData(Texture2D* texture,
                bytesPerRow:bytesPerRow];
 }
 
-void METALcreateBuffer(Buffer* buffer, u32 size, u32 index){
+void METALcreateBuffer(RenderBuffer* buffer, u32 size, u32 index){
     buffer->index = index;
     buffer->bufferData = [device newBufferWithLength: size
                                  options: MTLResourceStorageModeShared];
 }
 
-void METALcreateBufferWithData(Buffer* buffer, void* data, u32 dataSize, u32 index){
+void METALcreateBufferWithData(RenderBuffer* buffer, void* data, u32 dataSize, u32 index){
     buffer->index = index;
     buffer->bufferData = [device newBufferWithBytes: data
                                                  length: dataSize
@@ -85,7 +86,7 @@ void METALcreateShaderFromString(Shader* shader,
                                  const char* shaderCode, 
                                  const char* vertexFunctionName, 
                                  const char* fragmentFunctionName,
-                                 Buffer* vertexBuffer,
+                                 RenderBuffer* vertexBuffer,
                                  VertexBufferDescriptor* vertBufDescriptor){
 
     NSString* string = [[NSString alloc] initWithCString: shaderCode
@@ -106,17 +107,15 @@ void METALcreateShaderFromString(Shader* shader,
                                         encoding: NSUTF8StringEncoding];
     id<MTLFunction> fragmentFunction = [(id<MTLLibrary>)shader->shaderLibrary newFunctionWithName:string];
 
-    MTLRenderPipelineDescriptor *pipelineStateDescriptor = [[MTLRenderPipelineDescriptor alloc] init];
     pipelineStateDescriptor.vertexFunction = vertexFunction;
     pipelineStateDescriptor.fragmentFunction = fragmentFunction;
     pipelineStateDescriptor.colorAttachments[0].pixelFormat = view.colorPixelFormat;
-    // pipelineStateDescriptor.colorAttachments[0].blendingEnabled = YES;
-    // pipelineStateDescriptor.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
-    // pipelineStateDescriptor.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
-    // pipelineStateDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
-    // pipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
-    // pipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-    // pipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+    pipelineStateDescriptor.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
+    pipelineStateDescriptor.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
+    pipelineStateDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
+    pipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
+    pipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+    pipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
 
     u32 totalVerticesAttributes = vertBufDescriptor->totalAttributes;
     MTLVertexDescriptor *vertDescriptor = [MTLVertexDescriptor vertexDescriptor];
@@ -147,24 +146,87 @@ void METALcreateShaderFromString(Shader* shader,
     }
 }
 
-void METALbindVertexBuffer(Buffer* vertexBuffer){
+void METALcreateShaderFromPrecompiledBinary(Shader* shader, 
+                                              const void* shaderBinary, 
+                                              u32 binaryLength,
+                                              const char* vertexFunctionName, 
+                                              const char* fragmentFunctionName,
+                                              RenderBuffer* vertexBuffer,
+                                              VertexBufferDescriptor* vertBufDescriptor){
+
+    dispatch_data_t shaderData = dispatch_data_create(shaderBinary, binaryLength, dispatch_get_main_queue(), DISPATCH_DATA_DESTRUCTOR_DEFAULT);
+    NSError* err = 0;
+    shader->shaderLibrary = [device newLibraryWithData:shaderData
+                                    error: &err];
+                                                        
+    if(err){
+        NSLog(@"%@", [err localizedFailureReason]);
+    }
+    NSString* string = [[NSString alloc] initWithCString: vertexFunctionName
+                                        encoding: NSUTF8StringEncoding];
+
+    id<MTLFunction> vertexFunction = [(id<MTLLibrary>)shader->shaderLibrary newFunctionWithName:string];
+    string = [[NSString alloc] initWithCString: fragmentFunctionName
+                                        encoding: NSUTF8StringEncoding];
+    id<MTLFunction> fragmentFunction = [(id<MTLLibrary>)shader->shaderLibrary newFunctionWithName:string];
+
+    pipelineStateDescriptor.vertexFunction = vertexFunction;
+    pipelineStateDescriptor.fragmentFunction = fragmentFunction;
+    pipelineStateDescriptor.colorAttachments[0].pixelFormat = view.colorPixelFormat;
+    pipelineStateDescriptor.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
+    pipelineStateDescriptor.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
+    pipelineStateDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
+    pipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
+    pipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+    pipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+
+    u32 totalVerticesAttributes = vertBufDescriptor->totalAttributes;
+    MTLVertexDescriptor *vertDescriptor = [MTLVertexDescriptor vertexDescriptor];
+    u32 vertexBufferStride = 0;
+    for(u32 i = 0; i < totalVerticesAttributes; i++){
+        MTLVertexAttributeDescriptor *vertAttribDescriptor = [MTLVertexAttributeDescriptor new];
+
+        vertAttribDescriptor.format = metalVertexFormats[vertBufDescriptor->rendererVertexFormats[i]];
+        vertAttribDescriptor.offset = vertBufDescriptor->attributeBufferOffsets[i];
+        vertAttribDescriptor.bufferIndex = vertexBuffer->index;
+        [vertDescriptor.attributes setObject: vertAttribDescriptor atIndexedSubscript: i];
+        vertexBufferStride += vertBufDescriptor->attributeElementSizes[i] * (vertBufDescriptor->rendererVertexFormats[i] + 1);
+    }
+
+    MTLVertexBufferLayoutDescriptor *layoutDescriptor = [MTLVertexBufferLayoutDescriptor new];
+
+    layoutDescriptor.stride = vertexBufferStride;
+    layoutDescriptor.stepFunction = MTLVertexStepFunctionPerVertex;
+    layoutDescriptor.stepRate = 1;
+    [vertDescriptor.layouts setObject: layoutDescriptor atIndexedSubscript: vertexBuffer->index];
+
+    pipelineStateDescriptor.vertexDescriptor = vertDescriptor;
+
+    err = 0;
+    shader->shaderPipelineState = [device newRenderPipelineStateWithDescriptor:pipelineStateDescriptor error:&err];
+    if(err){
+        NSLog(@"%@", [err localizedFailureReason]);
+    }
+}
+
+void METALbindVertexBuffer(RenderBuffer* vertexBuffer){
     currentVertexBuffer = vertexBuffer;
     [renderEncoder setVertexBuffer:(id<MTLBuffer>)currentVertexBuffer->bufferData
                         offset:0
                         atIndex:currentVertexBuffer->index];
 }
 
-void METALbindIndexBuffer(Buffer* indexBuffer){
+void METALbindIndexBuffer(RenderBuffer* indexBuffer){
     currentIndexBuffer = indexBuffer;
 }
 
-void METALbindVertexUniformBuffer(Buffer* vertUniBuffer){
+void METALbindVertexUniformBuffer(RenderBuffer* vertUniBuffer){
     [renderEncoder setVertexBuffer:(id<MTLBuffer>)vertUniBuffer->bufferData
                             offset:0
                             atIndex:vertUniBuffer->index];
 }
 
-void METALbindFragmentUniformBuffer(Buffer* vertFragBuffer){
+void METALbindFragmentUniformBuffer(RenderBuffer* vertFragBuffer){
     [renderEncoder setFragmentBuffer:(id<MTLBuffer>)vertFragBuffer
                             offset:0
                             atIndex:vertFragBuffer->index];
@@ -227,8 +289,17 @@ void METALsetTexture2DSamplerMode(Texture2D* texture, TextureSamplerMode mode){
     }
 }
 
-void* METALgetPointerToBufferData(Buffer* buffer){
+void* METALgetPointerToBufferData(RenderBuffer* buffer){
     return [(id<MTLBuffer>)buffer->bufferData contents];
+}
+
+void METALenableBlending(bool enabled){
+    pipelineStateDescriptor.colorAttachments[0].blendingEnabled = enabled;
+    NSError* err;
+    currentShader->shaderPipelineState = [device newRenderPipelineStateWithDescriptor:pipelineStateDescriptor error:&err];
+    if(err){
+        NSLog(@"%@", [err localizedFailureReason]);
+    }
 }
 
 void initializeRenderDevice(RenderDevice* renderDevice, NSWindow* window){
@@ -247,6 +318,8 @@ void initializeRenderDevice(RenderDevice* renderDevice, NSWindow* window){
     view.enableSetNeedsDisplay = false;
     [window setContentView: view];
 
+    pipelineStateDescriptor = [[MTLRenderPipelineDescriptor alloc] init];
+
     textureDescriptor = [[MTLTextureDescriptor alloc] init];
 
     MTLSamplerDescriptor *samplerDescriptor = [MTLSamplerDescriptor new];
@@ -262,6 +335,7 @@ void initializeRenderDevice(RenderDevice* renderDevice, NSWindow* window){
     renderDevice->createBuffer = METALcreateBuffer;
     renderDevice->createBufferWithData = METALcreateBufferWithData;
     renderDevice->createShaderFromString = METALcreateShaderFromString;
+    renderDevice->createShaderFromPrecompiledBinary = METALcreateShaderFromPrecompiledBinary;
     renderDevice->bindVertexBuffer = METALbindVertexBuffer;
     renderDevice->bindIndexBuffer = METALbindIndexBuffer;
     renderDevice->bindVertexUniformBuffer = METALbindVertexUniformBuffer;
@@ -275,4 +349,5 @@ void initializeRenderDevice(RenderDevice* renderDevice, NSWindow* window){
     renderDevice->setTexture2DSamplerMode = METALsetTexture2DSamplerMode;
     renderDevice->bindTexture2D = METALbindTexture2D;
     renderDevice->getPointerToBufferData = METALgetPointerToBufferData;
+    renderDevice->enableBlending = METALenableBlending;
 }
