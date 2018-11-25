@@ -246,6 +246,9 @@ void METALbindTexture2D(Texture2D* texture){
 }
 
 void METALprepareRenderer(){
+    [commandQueue release];
+    [commandBuffer release];
+    [renderEncoder release];
     commandQueue = [device newCommandQueue];
     commandBuffer = [commandQueue commandBuffer];
     renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:view.currentRenderPassDescriptor];
@@ -270,9 +273,6 @@ void METALfinalizeRenderer(){
     [commandBuffer presentDrawable:view.currentDrawable];
     [commandBuffer commit];
     [view draw];
-    [commandBuffer release];
-    [renderEncoder release];
-    [commandQueue release];
 }
 
 void METALsetClearColor(float r, float g, float b, float a){

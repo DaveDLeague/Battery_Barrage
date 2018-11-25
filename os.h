@@ -1,6 +1,7 @@
 #pragma once
 
 struct OSDevice {
-    void (*readBinaryFile)(const char* fileName, u8** fileData, u64* fileLength);
-    void (*readTextFile)(const char* fileName, s8** fileData, u64* fileLength);
+    const s8* (*getPathToExecutable)();
+    void (*readBinaryFile)(const s8* fileName, u8** fileData, u64* fileLength);
+    void (*readTextFile)(const s8* fileName, s8** fileData, u64* fileLength);
 };

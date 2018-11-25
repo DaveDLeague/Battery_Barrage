@@ -23,13 +23,15 @@ OSDevice osDevice;
 RenderDevice renderDevice = {};
 TextObjectManager txtObjMgr = {};
 TextRenderer textRenderer = {};
+TerrainRenderer terrainRenderer = {};
 
 void OSXreadBinaryFile(const s8* fileName, u8** fileData, u64* fileLength){
     NSString* string = [[NSString alloc] initWithUTF8String: fileName];
     NSData* data = [NSData dataWithContentsOfFile: string];
-    
     *fileLength = [data length];
     *fileData = (u8*)[data bytes];
+    [string release];
+    [data release];//this might cause problems
 }
 
 void OSXreadTextFile(const s8* fileName, s8** fileData, u64* fileLength){
@@ -38,9 +40,15 @@ void OSXreadTextFile(const s8* fileName, s8** fileData, u64* fileLength){
     NSString* string = [NSString stringWithContentsOfFile: fl
                                         encoding: NSUTF8StringEncoding
                                         error: &err];
-    
+    [fl release];
     *fileLength = [string length];
     *fileData = (s8*)[string UTF8String];
+    [string release];//this might cause problems
+}
+
+const s8* OSXgetPathToExecutable(){
+    NSString *appParentDirectory = [[NSBundle mainBundle] bundlePath];
+    return (const s8*)[appParentDirectory UTF8String];
 }
 
 @class WindowDelegate;
@@ -62,10 +70,13 @@ void OSXdisplayMessageBox(const char* message){
     NSAlert *alert = [[[NSAlert alloc] init] autorelease];
     [alert setMessageText:string];
     [alert runModal];
+    [string release];
+    [alert release];
 }
 
 int main(int argc, char** argv){ 
 
+    osDevice.getPathToExecutable = OSXgetPathToExecutable;
     osDevice.readBinaryFile = OSXreadBinaryFile;
     osDevice.readTextFile = OSXreadTextFile;
 
@@ -109,7 +120,8 @@ int main(int argc, char** argv){
     initializeTextRenderer(&osDevice, &renderDevice, &textRenderer);
     setTextRendererProjection(&textRenderer, 0, WIDTH, 0, HEIGHT);
 
-
+    Terrain terrain;
+    initializeTerrainRenderer(&osDevice, &renderDevice, &terrainRenderer);
 
     void* handle = dlopen("./libbb.so", RTLD_LAZY);
     typedef void (*fnPtr)(float, BatteryBarrageState*);
@@ -120,6 +132,7 @@ int main(int argc, char** argv){
 
     NSError * error = 0;
     NSDictionary * attrs = [[NSFileManager defaultManager] attributesOfItemAtPath:path error:&error];
+
     if (attrs && !error){
         fileLastModifiedDate = [attrs fileModificationDate];
     }
@@ -149,25 +162,33 @@ int main(int argc, char** argv){
             }
         } while (ev);
 
-        // #ifdef DEBUG_COMPILE
-        // attrs = [[NSFileManager defaultManager] attributesOfItemAtPath:path error:&error];
-        // if (attrs && !error){
-        //     if([[attrs fileModificationDate] compare:fileLastModifiedDate] != NSOrderedSame){
-        //         dlclose(handle);
-        //         handle = dlopen("./libbb.so", RTLD_LAZY);
-        //         update = (fnPtr)dlsym(handle, "updateGameState");
-        //         fileLastModifiedDate = [attrs fileModificationDate];
-        //         NSLog(@"%@\t%@", [attrs fileModificationDate], fileLastModifiedDate);
-        //     }
-        // }
-        // #endif
-
+        #ifdef DEBUG_COMPILE
+        @autoreleasepool {
+            attrs = [[NSFileManager defaultManager] attributesOfItemAtPath:path error:&error];
+            if (attrs && !error){
+                NSDate* date = [attrs fileModificationDate];
+                if([date compare:fileLastModifiedDate] != NSOrderedSame){
+                    dlclose(handle);
+                    handle = dlopen("./libbb.so", RTLD_LAZY);
+                    update = (fnPtr)dlsym(handle, "updateGameState");
+                    fileLastModifiedDate = [attrs fileModificationDate];
+                    NSLog(@"%@\t%@", [attrs fileModificationDate], fileLastModifiedDate);
+                }
+            }
+        }
+        #endif
+        
         renderDevice.prepareRenderer();
+
+        prepareTerrainRenderer(&terrainRenderer);
+        renderTerrain(&terrainRenderer, &terrain);
 
         prepareTextRenderer(&textRenderer);
         renderTextObjects(&textRenderer, &txtObjMgr);
         finalizeTextRenderer(&textRenderer);
+
         renderDevice.finalizeRenderer();
+    
     }
 
 	[pool drain]; 

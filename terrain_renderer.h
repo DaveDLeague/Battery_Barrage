@@ -12,7 +12,8 @@ struct Terrain {
 };
 
 struct TerrainRenderer {
-    RenderDevice* device;
+    OSDevice* osDevice;
+    RenderDevice* renderDevice;
     Shader shader; 
     RenderBuffer vertexBuffer;
     RenderBuffer indexBuffer;
