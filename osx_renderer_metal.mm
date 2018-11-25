@@ -246,6 +246,7 @@ void METALbindTexture2D(Texture2D* texture){
 }
 
 void METALprepareRenderer(){
+    commandQueue = [device newCommandQueue];
     commandBuffer = [commandQueue commandBuffer];
     renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:view.currentRenderPassDescriptor];
 }
@@ -269,6 +270,9 @@ void METALfinalizeRenderer(){
     [commandBuffer presentDrawable:view.currentDrawable];
     [commandBuffer commit];
     [view draw];
+    [commandBuffer release];
+    [renderEncoder release];
+    [commandQueue release];
 }
 
 void METALsetClearColor(float r, float g, float b, float a){
@@ -306,7 +310,6 @@ void initializeRenderDevice(RenderDevice* renderDevice, NSWindow* window){
     renderDevice->subsystem = RENDERER_SUBSYSTEM_METAL;
 
     device = MTLCreateSystemDefaultDevice();
-    commandQueue = [device newCommandQueue];
     view = [[MTKView alloc] initWithFrame: NSMakeRect(0, 0, 
                                                         window.contentView.frame.size.width, 
                                                         window.contentView.frame.size.height)

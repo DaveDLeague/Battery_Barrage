@@ -109,6 +109,8 @@ int main(int argc, char** argv){
     initializeTextRenderer(&osDevice, &renderDevice, &textRenderer);
     setTextRendererProjection(&textRenderer, 0, WIDTH, 0, HEIGHT);
 
+
+
     void* handle = dlopen("./libbb.so", RTLD_LAZY);
     typedef void (*fnPtr)(float, BatteryBarrageState*);
     fnPtr update = (fnPtr)dlsym(handle, "updateGameState");
@@ -147,20 +149,21 @@ int main(int argc, char** argv){
             }
         } while (ev);
 
-        #ifdef DEBUG_COMPILE
-        attrs = [[NSFileManager defaultManager] attributesOfItemAtPath:path error:&error];
-        if (attrs && !error){
-            if([[attrs fileModificationDate] compare:fileLastModifiedDate] != NSOrderedSame){
-                dlclose(handle);
-                handle = dlopen("./libbb.so", RTLD_LAZY);
-                update = (fnPtr)dlsym(handle, "updateGameState");
-                fileLastModifiedDate = [attrs fileModificationDate];
-                NSLog(@"%@\t%@", [attrs fileModificationDate], fileLastModifiedDate);
-            }
-        }
-        #endif
+        // #ifdef DEBUG_COMPILE
+        // attrs = [[NSFileManager defaultManager] attributesOfItemAtPath:path error:&error];
+        // if (attrs && !error){
+        //     if([[attrs fileModificationDate] compare:fileLastModifiedDate] != NSOrderedSame){
+        //         dlclose(handle);
+        //         handle = dlopen("./libbb.so", RTLD_LAZY);
+        //         update = (fnPtr)dlsym(handle, "updateGameState");
+        //         fileLastModifiedDate = [attrs fileModificationDate];
+        //         NSLog(@"%@\t%@", [attrs fileModificationDate], fileLastModifiedDate);
+        //     }
+        // }
+        // #endif
 
         renderDevice.prepareRenderer();
+
         prepareTextRenderer(&textRenderer);
         renderTextObjects(&textRenderer, &txtObjMgr);
         finalizeTextRenderer(&textRenderer);
