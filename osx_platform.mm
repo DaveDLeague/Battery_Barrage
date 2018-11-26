@@ -129,7 +129,7 @@ int main(int argc, char** argv){
     [NSApp activateIgnoringOtherApps:true];
 
     initializeRenderDevice(&renderDevice, window);
-    renderDevice.setClearColor(0.0, 0.6, 1, 1);
+    renderDevice.setClearColor(0.4, 0.8, 1, 1);
 
     initializeTextRenderer(&osDevice, &renderDevice, &textRenderer);
     setTextRendererProjection(&textRenderer, 0, WIDTH, 0, HEIGHT);

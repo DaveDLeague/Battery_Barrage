@@ -22,5 +22,8 @@ vertex VertOut vertexShader(VertIn in[[stage_in]], constant Uniforms* uniforms[[
 }
 
 fragment half4 fragmentShader(VertOut in [[stage_in]]){
-    return half4(0.1, in.y, 0.2, 1);
+    float r = ((in.y + 1) / 2) - 0.5;
+    float g = ((in.y + 1) / 2) + 0.5;
+    float b = abs(in.y);
+    return half4(r, g, b, 1);
 }

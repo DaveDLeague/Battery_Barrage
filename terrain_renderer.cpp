@@ -43,14 +43,14 @@ void initializeTerrainRenderer(OSDevice* osDevice, RenderDevice* renderDevice, T
     u16* elms = new u16[totalIndices];
     u32 ctr = 0;
 
-    f32 x = 0;
-    f32 z = 0;
+    f32 x = -width / 2;
+    f32 z = -width / 2;
     f32 s = 1;
     for(int i = 0; i < totalVertices; i++){
         verts[ctr++] = x; verts[ctr++] = sin(x) + sin(z); verts[ctr++] = z;  
         x += s;
-        if(x >= width){
-            x = 0;
+        if(x >= width / 2){
+            x =  -width / 2;
             z += s;
         } 
         terrainRenderer->totalVertices++;
