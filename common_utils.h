@@ -19,3 +19,9 @@ typedef double f64;
     #define ASSERT(X) 
 #endif
 
+u32 getStringLength(const s8* str){
+    int ctr = 0;
+    char c;
+    while((c = str[ctr++]) != '\0');
+    return ctr;
+}

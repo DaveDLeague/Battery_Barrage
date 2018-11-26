@@ -178,10 +178,13 @@ void finalizeTextRenderer(TextRenderer* textRenderer){
 void initializeTextRenderer(OSDevice* osDevice, RenderDevice* renderDevice, TextRenderer* textRenderer){
     textRenderer->osDevice = osDevice;
     textRenderer->renderDevice = renderDevice;
-
+    textRenderer->totalVertices = 0;
+    textRenderer->totalIndices = 0;
     u8* fontFileData;
     u64 len;
-    osDevice->readBinaryFile("./font atlas builder/courier_new.fontatlas", &fontFileData, &len);
+    const s8* faPth = osDevice->getPathFromExecutable("font atlas builder/courier_new.fontatlas");
+    osDevice->readBinaryFile(faPth, &fontFileData, &len);
+    delete[]faPth;
     loadCharacterAtlas(fontFileData, &textRenderer->charAtlas);
 
     renderDevice->createBuffer(&textRenderer->vertexBuffer, TextRenderer::MAX_VERTICES, 0);
@@ -206,7 +209,9 @@ void initializeTextRenderer(OSDevice* osDevice, RenderDevice* renderDevice, Text
 
     s8* shaderText;
     u64 fileLength;
-    osDevice->readTextFile("text_shader.metal", &shaderText, &fileLength);
+    const s8* shPth = osDevice->getPathFromExecutable("text_shader.metal");
+    osDevice->readTextFile(shPth, &shaderText, &fileLength);
+    delete[] shPth;
 
     renderDevice->createShaderFromString(&textRenderer->shader, (const char*)shaderText, "vertexShader", "fragmentShader", &textRenderer->vertexBuffer, &vbd);
     renderDevice->bindShader(&textRenderer->shader);

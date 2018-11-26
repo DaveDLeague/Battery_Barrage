@@ -94,7 +94,10 @@ void initializeTerrainRenderer(OSDevice* osDevice, RenderDevice* renderDevice, T
 
     s8* shaderText;
     u64 fileLength;
-    osDevice->readTextFile("terrain_shader.metal", &shaderText, &fileLength);
+
+    const s8* pth = osDevice->getPathFromExecutable("terrain_shader.metal");
+    osDevice->readTextFile(pth, &shaderText, &fileLength);
+    delete[] pth;
 
     renderDevice->createShaderFromString(&terrainRenderer->shader, (const char*)shaderText, "vertexShader", "fragmentShader", &terrainRenderer->vertexBuffer, &vbd);
     renderDevice->bindShader(&terrainRenderer->shader);

@@ -38,10 +38,12 @@ void OSXreadBinaryFile(const s8* fileName, u8** fileData, u64* fileLength){
 
 void OSXreadTextFile(const s8* fileName, s8** fileData, u64* fileLength){
     NSError* err;
-    NSString* fl = [[NSString alloc] initWithUTF8String: fileName];
+    const s8* fn = fileName;
+    NSString* fl = [[NSString alloc] initWithUTF8String: fn];
     NSString* string = [NSString stringWithContentsOfFile: fl
                                         encoding: NSUTF8StringEncoding
                                         error: &err];
+
     [fl release];
     *fileLength = [string length];
     *fileData = (s8*)[string UTF8String];
@@ -53,6 +55,23 @@ const s8* OSXgetPathToExecutable(){
     const s8* path = [appParentDirectory UTF8String];
     [appParentDirectory release];
     return path;
+}
+
+const s8* OSXgetPathFromExecutable(const s8* path){
+    const s8* execPath = OSXgetPathToExecutable();
+    u32 epLen = getStringLength(execPath);
+    u32 pLen = getStringLength(path);
+    u32 fullLen = epLen + pLen;
+    s8* fullPath = new s8[fullLen];
+    for(u32 i = 0; i < epLen - 1; i++){
+        fullPath[i] = execPath[i];
+    }
+    fullPath[epLen - 1] = '/';
+    for(u32 i = 0; i < pLen; i++){
+        fullPath[i + epLen] = path[i];
+    }
+
+    return (const s8*)fullPath;
 }
 
 @class WindowDelegate;
@@ -81,6 +100,7 @@ void OSXdisplayMessageBox(const char* message){
 int main(int argc, char** argv){ 
 
     osDevice.getPathToExecutable = OSXgetPathToExecutable;
+    osDevice.getPathFromExecutable = OSXgetPathFromExecutable;
     osDevice.readBinaryFile = OSXreadBinaryFile;
     osDevice.readTextFile = OSXreadTextFile;
 
@@ -127,11 +147,11 @@ int main(int argc, char** argv){
     Terrain terrain;
     initializeTerrainRenderer(&osDevice, &renderDevice, &terrainRenderer);
 
-    void* handle = dlopen("./libbb.so", RTLD_LAZY);
+    void* handle = dlopen(OSXgetPathFromExecutable("libbb.so"), RTLD_LAZY);
     typedef void (*fnPtr)(float, BatteryBarrageState*);
     fnPtr update = (fnPtr)dlsym(handle, "updateGameState");
 
-    NSString * path = @"./libbb.so";
+    NSString * path = [[NSString alloc] initWithUTF8String: OSXgetPathFromExecutable("libbb.so")];
     NSDate * fileLastModifiedDate = 0;
 
     NSError * error = 0;
@@ -234,7 +254,7 @@ int main(int argc, char** argv){
                 NSDate* date = [attrs fileModificationDate];
                 if([date compare:fileLastModifiedDate] != NSOrderedSame){
                     dlclose(handle);
-                    handle = dlopen("./libbb.so", RTLD_LAZY);
+                    handle = dlopen(OSXgetPathFromExecutable("libbb.so"), RTLD_LAZY);
                     update = (fnPtr)dlsym(handle, "updateGameState");
                     fileLastModifiedDate = [attrs fileModificationDate];
                     NSLog(@"%@\t%@", [attrs fileModificationDate], fileLastModifiedDate);
