@@ -11,6 +11,10 @@ struct Terrain {
     TerrainVertex vertices[HEIGHTMAP_WIDTH][HEIGHTMAP_WIDTH];
 };
 
+struct TerrainUniforms {
+    Matrix4 projectionViewMatrix;
+};
+
 struct TerrainRenderer {
     OSDevice* osDevice;
     RenderDevice* renderDevice;
@@ -18,4 +22,6 @@ struct TerrainRenderer {
     RenderBuffer vertexBuffer;
     RenderBuffer indexBuffer;
     RenderBuffer uniformBuffer;
+    u32 totalVertices;
+    u32 totalIndices;
 };

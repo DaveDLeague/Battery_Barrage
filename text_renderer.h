@@ -40,7 +40,7 @@ struct TextObjectManager {
 };
 
 struct TextRenderer {
-    static const u32 MAX_VERTICES = 65536;
+    static const u32 MAX_VERTICES = 65535;
     static const u32 MAX_INDICES = (MAX_VERTICES / 4) * 6;
     OSDevice* osDevice;
     RenderDevice* renderDevice;

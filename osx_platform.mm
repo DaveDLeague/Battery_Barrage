@@ -11,6 +11,8 @@
 
 #include "os.h"
 
+#include "camera.cpp"
+
 #include "text_renderer.cpp"
 #include "terrain_renderer.cpp"
 
@@ -48,7 +50,9 @@ void OSXreadTextFile(const s8* fileName, s8** fileData, u64* fileLength){
 
 const s8* OSXgetPathToExecutable(){
     NSString *appParentDirectory = [[NSBundle mainBundle] bundlePath];
-    return (const s8*)[appParentDirectory UTF8String];
+    const s8* path = [appParentDirectory UTF8String];
+    [appParentDirectory release];
+    return path;
 }
 
 @class WindowDelegate;
@@ -137,10 +141,20 @@ int main(int argc, char** argv){
         fileLastModifiedDate = [attrs fileModificationDate];
     }
 
-    TextObject* tobj = createTextObject(&txtObjMgr, "HEL LO", 100, 100, 0.7, Vector4(1, 0, 0, 1));
-    TextObject* tobj2 = createTextObject(&txtObjMgr, "@ @@ @@@@", 200, 200, 1, Vector4(1, 1, 1, 0.5));
-    TextObject* tobj3 = createTextObject(&txtObjMgr, "+35T #$", 200, 400, 1, Vector4(0, 0, 1, 0.25));
+    TextObject* tobj = createTextObject(&txtObjMgr, "mspf: 0", 50, 650, 1, Vector4(0, 0, 0, 1));
+    TextObject* tobj2 = createTextObject(&txtObjMgr, "please pass the pineapple pizza", 50, 500, 1, Vector4(0, 0, 0, 1));
 
+    Camera camera;
+    camera.position = Vector3(0, -5, -20);
+
+    float moveSpeed = 0.1;
+    bool moveForward = false;
+    bool moveBack = false;
+    bool moveLeft = false;
+    bool moveRight = false;
+    bool moveUp = false;
+    bool moveDown = false;
+    
     NSEvent* ev;  
     while(true){
         do {
@@ -153,6 +167,57 @@ int main(int argc, char** argv){
                     switch([ev keyCode]){
                         case kVK_Escape:{
                             [NSApp terminate: NSApp];
+                            break;
+                        }
+                        case kVK_ANSI_W:{
+                            moveForward = true;
+                            break;
+                        }
+                        case kVK_ANSI_S:{
+                            moveBack = true;
+                            break;
+                        }
+                        case kVK_ANSI_A:{
+                            moveRight = true;
+                            break;
+                        }
+                        case kVK_ANSI_D:{
+                            moveLeft = true;
+                            break;
+                        }
+                        case kVK_ANSI_R:{
+                            moveUp = true;
+                            break;
+                        }
+                        case kVK_ANSI_F:{
+                            moveDown = true;
+                            break;
+                        }
+                    }
+                }else if([ev type] == NSEventTypeKeyUp){
+                    switch([ev keyCode]){
+                        case kVK_ANSI_W:{
+                            moveForward = false;
+                            break;
+                        }
+                        case kVK_ANSI_S:{
+                            moveBack = false;
+                            break;
+                        }
+                        case kVK_ANSI_A:{
+                            moveRight = false;
+                            break;
+                        }
+                        case kVK_ANSI_D:{
+                            moveLeft = false;
+                            break;
+                        }
+                        case kVK_ANSI_R:{
+                            moveUp = false;
+                            break;
+                        }
+                        case kVK_ANSI_F:{
+                            moveDown = false;
                             break;
                         }
                     }
@@ -181,7 +246,14 @@ int main(int argc, char** argv){
         renderDevice.prepareRenderer();
 
         prepareTerrainRenderer(&terrainRenderer);
-        renderTerrain(&terrainRenderer, &terrain);
+
+        camera.position.z += moveForward * moveSpeed;
+        camera.position.z -= moveBack * moveSpeed;
+        camera.position.x += moveRight * moveSpeed;
+        camera.position.x -= moveLeft * moveSpeed;
+        camera.position.y -= moveUp * moveSpeed;
+        camera.position.y += moveDown * moveSpeed;
+        renderTerrain(&terrainRenderer, &terrain, &camera);
 
         prepareTextRenderer(&textRenderer);
         renderTextObjects(&textRenderer, &txtObjMgr);

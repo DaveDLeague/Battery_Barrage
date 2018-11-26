@@ -181,7 +181,7 @@ void initializeTextRenderer(OSDevice* osDevice, RenderDevice* renderDevice, Text
 
     u8* fontFileData;
     u64 len;
-    osDevice->readBinaryFile("./font atlas builder/times_new_roman.fontatlas", &fontFileData, &len);
+    osDevice->readBinaryFile("./font atlas builder/courier_new.fontatlas", &fontFileData, &len);
     loadCharacterAtlas(fontFileData, &textRenderer->charAtlas);
 
     renderDevice->createBuffer(&textRenderer->vertexBuffer, TextRenderer::MAX_VERTICES, 0);
