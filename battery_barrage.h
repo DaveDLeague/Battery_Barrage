@@ -1,8 +1,10 @@
 #pragma once
-
 #include "common_utils.h"
-#include "graphics_math.h"
-#include "text_renderer.h"
+#include "os.h"
+#include "graphics_math.cpp"
+#include "camera.cpp"
+#include "text_renderer.cpp"
+#include "terrain_renderer.cpp"
 
 struct BatteryBarrageState {
     u32 gameWidth;

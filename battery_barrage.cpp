@@ -1,5 +1,3 @@
-#include "common_utils.h"
-
 #include "battery_barrage.h"
 
 void initializeGameState(BatteryBarrageState* bbState){

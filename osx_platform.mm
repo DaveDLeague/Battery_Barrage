@@ -5,18 +5,8 @@
 #include <GameController/GameController.h>
 #include <dlfcn.h>
 
-#include "common_utils.h"
-#include "graphics_math.cpp"
-#include "osx_renderer_metal.mm"
-
-#include "os.h"
-
-#include "camera.cpp"
-
-#include "text_renderer.cpp"
-#include "terrain_renderer.cpp"
-
 #include "battery_barrage.cpp"
+#include "osx_renderer_metal.mm"
 
 #define WIDTH 1280
 #define HEIGHT 720

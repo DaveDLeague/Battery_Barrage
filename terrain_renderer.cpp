@@ -36,8 +36,9 @@ void initializeTerrainRenderer(OSDevice* osDevice, RenderDevice* renderDevice, T
 
     u32 totalVertices = 10000;
     f32 width = sqrt(totalVertices);
+    u32 totalRects = (u32)(width - 1) * (u32)(width - 1);
     u32 totalFloats = totalVertices * 3;
-    u32 totalIndices = totalVertices * 6;
+    u32 totalIndices = totalRects * 6;
     f32* verts = new f32[totalFloats];
     u16* elms = new u16[totalIndices];
     u32 ctr = 0;
@@ -56,10 +57,23 @@ void initializeTerrainRenderer(OSDevice* osDevice, RenderDevice* renderDevice, T
     }
     
     ctr = 0;
+    u32 elNum = 0;
+    int rc = 0;
+    for(int i = 0; i < totalRects; i++){
+        elms[ctr++] = elNum; 
+        elms[ctr++] = elNum + 1; 
+        elms[ctr++] = elNum + width;
+        elms[ctr++] = elNum + width; 
+        elms[ctr++] = elNum + 1; 
+        elms[ctr++] = elNum + width + 1;
+        rc++;
+        if(rc == (u32)width - 1){
+            rc = 0;
+            elNum += 2;
+        }else{
+            elNum++;
+        }
 
-    for(int i = 0; i < totalVertices; i++){
-        elms[ctr++] = i; elms[ctr++] = i + 1; elms[ctr++] = i + width;
-        elms[ctr++] = i + width; elms[ctr++] = i + 1; elms[ctr++] = i + width + 1;
         terrainRenderer->totalIndices += 6;
     }
     
