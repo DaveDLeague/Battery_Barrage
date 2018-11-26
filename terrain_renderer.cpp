@@ -34,46 +34,38 @@ void initializeTerrainRenderer(OSDevice* osDevice, RenderDevice* renderDevice, T
     u8* fontFileData;
     u64 len;
 
-    u32 totalFloats = 1000 * 4 * 3;
-    u32 totalVerts = totalFloats / 12;
-    u32 totalElements = totalVerts * 6;
+    u32 totalVertices = 10000;
+    f32 width = sqrt(totalVertices);
+    u32 totalFloats = totalVertices * 3;
+    u32 totalIndices = totalVertices * 6;
     f32* verts = new f32[totalFloats];
-    u16* elms = new u16[totalElements];
-
-    
-
-    float startX = -sqrt(totalVerts) / 2;
-    float startZ = -sqrt(totalVerts) / 2;
-    float s = 1;
+    u16* elms = new u16[totalIndices];
     u32 ctr = 0;
 
-    for(int i = 0; i < totalVerts; i++){
-
-        verts[ctr++] = startX;     verts[ctr++] = sin(startX) + sin(startZ); verts[ctr++] = startZ;
-        verts[ctr++] = startX;     verts[ctr++] = sin(startX) + sin(startZ + s); verts[ctr++] = startZ + s;
-        verts[ctr++] = startX + s; verts[ctr++] = sin(startX + s) + sin(startZ + s); verts[ctr++] = startZ + s;
-        verts[ctr++] = startX + s; verts[ctr++] = sin(startX + s) + sin(startZ); verts[ctr++] = startZ;
-        terrainRenderer->totalVertices += 4;
-        startX += s;
-        if(startX >= sqrt(totalVerts) / 2){
-            startX = -sqrt(totalVerts) / 2;
-            startZ += s;
-        }
+    f32 x = 0;
+    f32 z = 0;
+    f32 s = 1;
+    for(int i = 0; i < totalVertices; i++){
+        verts[ctr++] = x; verts[ctr++] = sin(x) + sin(z); verts[ctr++] = z;  
+        x += s;
+        if(x >= width){
+            x = 0;
+            z += s;
+        } 
+        terrainRenderer->totalVertices++;
     }
-
+    
     ctr = 0;
-    u32 num = 0;
-    for(int i = 0; i < totalVerts; i++){
-        elms[ctr++] = num; elms[ctr++] = num + 1; elms[ctr++] = num + 2;
-        elms[ctr++] = num + 2; elms[ctr++] = num + 3; elms[ctr++] = num;
-        num += 4;
+
+    for(int i = 0; i < totalVertices; i++){
+        elms[ctr++] = i; elms[ctr++] = i + 1; elms[ctr++] = i + width;
+        elms[ctr++] = i + width; elms[ctr++] = i + 1; elms[ctr++] = i + width + 1;
         terrainRenderer->totalIndices += 6;
     }
-
-    renderDevice->createBufferWithData(&terrainRenderer->vertexBuffer, verts, sizeof(f32) * totalFloats, 0);
-    renderDevice->createBufferWithData(&terrainRenderer->indexBuffer, elms, sizeof(u16) * totalElements, 1);
-    renderDevice->createBuffer(&terrainRenderer->uniformBuffer, sizeof(TerrainUniforms), 2);
     
+    renderDevice->createBufferWithData(&terrainRenderer->vertexBuffer, verts, sizeof(f32) * totalFloats, 0);
+    renderDevice->createBufferWithData(&terrainRenderer->indexBuffer, elms, sizeof(u16) * totalIndices, 1);
+    renderDevice->createBuffer(&terrainRenderer->uniformBuffer, sizeof(TerrainUniforms), 2);
     delete[] verts;
     delete[] elms;
 
