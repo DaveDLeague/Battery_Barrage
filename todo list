@@ -3,10 +3,15 @@ TODO's
 +create a window
 +render a triangle
 +textured quads
--render text
--render a 3D scene
++render text
++render a 3D scene
 -sound
 -camera movement
 -physics
 -one level prototype
 -multiple levels
+
+BUGS
+
+-Sometimes get garbage on framebuffer. Only sometimes.
+-Characters that go below the baseline (e.g. 'p' 'q' 'y') are rendering at the wrong size and position.

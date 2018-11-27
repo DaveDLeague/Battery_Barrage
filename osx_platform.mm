@@ -151,13 +151,22 @@ int main(int argc, char** argv){
         fileLastModifiedDate = [attrs fileModificationDate];
     }
 
-    TextObject* tobj = createTextObject(&txtObjMgr, "mspf: 0", 50, 650, 1, Vector4(0, 0, 0, 1));
-    TextObject* tobj2 = createTextObject(&txtObjMgr, "please pass the pineapple pizza", 50, 500, 1, Vector4(0, 0, 0, 1));
+    TextObject* nums = createTextObject(&txtObjMgr, "1234567890", 50, 650);
+    TextObject* spec = createTextObject(&txtObjMgr, "`~!@#$\\/%^&*()-_=+?><\";", 50, 600);
+    TextObject* tpLo = createTextObject(&txtObjMgr, "qwertyuiop", 50, 550);
+    TextObject* mdLo = createTextObject(&txtObjMgr, "asdfghjkl", 50, 500);
+    TextObject* btLo = createTextObject(&txtObjMgr, "zxcvbnm", 50, 450);
+    TextObject* tpUp = createTextObject(&txtObjMgr, "QWERTYUIOP", 50, 400);
+    TextObject* mdUp = createTextObject(&txtObjMgr, "ASDFGHJKL", 50, 350);
+    TextObject* btUp = createTextObject(&txtObjMgr, "ZXCVBNM", 50, 300);
 
     Camera camera;
-    camera.position = Vector3(0, -5, -20);
+    camera.forward = Vector3(0, 0, 1);
+    camera.right = Vector3(1, 0, 0);
+    camera.up = Vector3(0, 1, 0);
+    camera.position = Vector3(0, -5, -100);
 
-    float moveSpeed = 0.1;
+    f32 moveSpeed = 0.5;
     bool moveForward = false;
     bool moveBack = false;
     bool moveLeft = false;
@@ -165,7 +174,7 @@ int main(int argc, char** argv){
     bool moveUp = false;
     bool moveDown = false;
     
-    NSEvent* ev;  
+    NSEvent* ev; 
     while(true){
         do {
             ev = [NSApp nextEventMatchingMask: NSEventMaskAny
@@ -252,17 +261,17 @@ int main(int argc, char** argv){
             }
         }
         #endif
-        
+
         renderDevice.prepareRenderer();
 
-        prepareTerrainRenderer(&terrainRenderer);
+        camera.position += (camera.forward * moveForward * moveSpeed);
+        camera.position -= (camera.forward * moveBack * moveSpeed);
+        camera.position += (camera.right * moveRight * moveSpeed);
+        camera.position -= (camera.right * moveLeft * moveSpeed);
+        camera.position -= (camera.up * moveUp * moveSpeed);
+        camera.position += (camera.up * moveDown * moveSpeed);
 
-        camera.position.z += moveForward * moveSpeed;
-        camera.position.z -= moveBack * moveSpeed;
-        camera.position.x += moveRight * moveSpeed;
-        camera.position.x -= moveLeft * moveSpeed;
-        camera.position.y -= moveUp * moveSpeed;
-        camera.position.y += moveDown * moveSpeed;
+        prepareTerrainRenderer(&terrainRenderer);
         renderTerrain(&terrainRenderer, &terrain, &camera);
 
         prepareTextRenderer(&textRenderer);

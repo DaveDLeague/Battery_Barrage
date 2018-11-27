@@ -34,7 +34,7 @@ void initializeTerrainRenderer(OSDevice* osDevice, RenderDevice* renderDevice, T
     u8* fontFileData;
     u64 len;
 
-    u32 totalVertices = 10000;
+    u32 totalVertices = 40000;
     f32 width = sqrt(totalVertices);
     u32 totalRects = (u32)(width - 1) * (u32)(width - 1);
     u32 totalFloats = totalVertices * 3;
@@ -76,10 +76,11 @@ void initializeTerrainRenderer(OSDevice* osDevice, RenderDevice* renderDevice, T
 
         terrainRenderer->totalIndices += 6;
     }
-    
+
     renderDevice->createBufferWithData(&terrainRenderer->vertexBuffer, verts, sizeof(f32) * totalFloats, 0);
     renderDevice->createBufferWithData(&terrainRenderer->indexBuffer, elms, sizeof(u16) * totalIndices, 1);
     renderDevice->createBuffer(&terrainRenderer->uniformBuffer, sizeof(TerrainUniforms), 2);
+
     delete[] verts;
     delete[] elms;
 

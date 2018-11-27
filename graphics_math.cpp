@@ -55,3 +55,72 @@ Matrix4 multiply(Matrix4 m1, Matrix4 m2){
     m.m[3][3] = (m1.m[0][3] * m2.m[3][0]) + (m1.m[1][3] * m2.m[3][1]) + (m1.m[2][3] * m2.m[3][2]) + (m1.m[3][3] * m2.m[3][3]);
     return m; 
 }
+
+void normalize(Quaternion* q){
+    float length = sqrt((q->x * q->x) + (q->y * q->y) + (q->z * q->z) + (q->w * q->w));
+    if(length == 0){
+        q->x = 0, q->y = 0, q->z = 0, q->w = 0;
+    }else{
+        q->x /= length;
+        q->y /= length;
+        q->z /= length;
+        q->w /= length;
+    }
+}
+
+Quaternion rotationToQuaternion(Vector3 axis, f32 angle){
+    f32 hang = angle / 2.0f;
+    Quaternion q;
+    f32 sHang = sin(hang);
+    q.x = axis.x * sHang;
+    q.y = axis.y * sHang;
+    q.z = axis.z * sHang;
+    q.w = cos(hang);
+    normalize(&q);
+    return q;
+}
+
+Quaternion multiply(Quaternion q1, Quaternion q2){
+    Quaternion q;
+    q.x =   q1.x * q2.w + q1.y * q2.z - q1.z * q2.y + q1.w * q2.x;
+    q.y =  -q1.x * q2.z + q1.y * q2.w + q1.z * q2.x + q1.w * q2.y;
+    q.z =   q1.x * q2.y - q1.y * q2.x + q1.z * q2.w + q1.w * q2.z;
+    q.w =  -q1.x * q2.x - q1.y * q2.y - q1.z * q2.z + q1.w * q2.w;
+    return q;
+}
+
+Vector3 operator+(Vector3 v1, f32 v){
+    return Vector3(v1.x + v, v1.y + v, v1.z + v);
+}
+
+Vector3 operator+(Vector3 v1, Vector3 v2){
+    return Vector3(v1.x + v2.x, v1.y + v2.y, v1.z + v2.z);
+}
+
+void operator+=(Vector3& v1, Vector3 v2){
+    v1.x += v2.x;
+    v1.y += v2.y;
+    v1.z += v2.z;
+}
+
+Vector3 operator-(Vector3 v1, f32 v){
+    return Vector3(v1.x - v, v1.y - v, v1.z - v);
+}
+
+Vector3 operator-(Vector3 v1, Vector3 v2){
+    return Vector3(v1.x - v2.x, v1.y - v2.y, v1.z - v2.z);
+}
+
+void operator-=(Vector3& v1, Vector3 v2){
+    v1.x -= v2.x;
+    v1.y -= v2.y;
+    v1.z -= v2.z;
+}
+
+Vector3 operator*(Vector3 v1, f32 v){
+    return Vector3(v1.x * v, v1.y * v, v1.z * v);
+}
+
+Vector3 operator*(Vector3 v1, Vector3 v2){
+    return Vector3(v1.x * v2.x, v1.y * v2.y, v1.z * v2.z);
+}
