@@ -45,7 +45,7 @@ void initializeTerrainRenderer(OSDevice* osDevice, RenderDevice* renderDevice, T
     u32 totalVertices = 40000;
     f32 width = sqrt(totalVertices);
     u32 totalRects = (u32)(width - 1) * (u32)(width - 1);
-    u32 totalFloats = totalVertices * 3;
+    u32 totalFloats = totalVertices * 6;
     u32 totalIndices = totalRects * 6;
     f32* verts = new f32[totalFloats];
     u16* elms = new u16[totalIndices];
@@ -55,12 +55,36 @@ void initializeTerrainRenderer(OSDevice* osDevice, RenderDevice* renderDevice, T
     f32 z = -width / 2;
     f32 s = 1;
     for(int i = 0; i < totalVertices; i++){
-        verts[ctr++] = x; verts[ctr++] = sin(x) + sin(z); verts[ctr++] = z;  
+        float sinX = sin(x);
+        float sinZ = sin(z);
+        float cosX = cos(x);
+        float cosZ = cos(z);
+        verts[ctr++] = x; verts[ctr++] = sinX + sinZ; verts[ctr++] = z;  
         x += s;
         if(x >= width / 2){
             x =  -width / 2;
             z += s;
         } 
+
+        Vector3 v1;
+        Vector3 v2;
+
+        if(cosX == 0){
+            v1 = Vector3(0, 1, 0);
+        }else{
+            v1 = normalize(Vector3(1, -1 / cosX, 0));
+        }
+        if(cosZ == 0){
+            v2 = Vector3(0, 1, 0);
+        }else{
+            v2 = normalize(Vector3(0, -1 / cosZ, 1));
+        }
+
+        Vector3 norm = normalize(v1 + v2);
+
+        verts[ctr++] = norm.x;
+        verts[ctr++] = norm.y;
+        verts[ctr++] = norm.z;
         terrainRenderer->totalVertices++;
     }
     
@@ -93,16 +117,16 @@ void initializeTerrainRenderer(OSDevice* osDevice, RenderDevice* renderDevice, T
     delete[] elms;
 
     RendererVertexFormat rvf[] = {
-        RENDERER_VERTEX_FORMAT_F32x3
+        RENDERER_VERTEX_FORMAT_F32x3, RENDERER_VERTEX_FORMAT_F32x3
     };
     u32 elemSizes[] = {
-        sizeof(float)
+        sizeof(float), sizeof(float)
     };
     u32 bufOffs[] = {
-        0
+        0, sizeof(float) * 3
     };
     VertexBufferDescriptor vbd;
-    vbd.totalAttributes = 1;
+    vbd.totalAttributes = 2;
     vbd.rendererVertexFormats = rvf;
     vbd.attributeElementSizes = elemSizes;
     vbd.attributeBufferOffsets = bufOffs;

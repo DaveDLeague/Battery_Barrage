@@ -56,6 +56,18 @@ Matrix4 multiply(Matrix4 m1, Matrix4 m2){
     return m; 
 }
 
+Vector3 normalize(Vector3 v){
+    float length = sqrt((v.x * v.x) + (v.y * v.y) + (v.z * v.z));
+    if(length == 0){
+        v.x = 0, v.y = 0, v.z = 0;
+    }else{
+        v.x /= length;
+        v.y /= length;
+        v.z /= length;
+    }
+    return v;
+}
+
 void normalize(Vector3* v){
     float length = sqrt((v->x * v->x) + (v->y * v->y) + (v->z * v->z));
     if(length == 0){
