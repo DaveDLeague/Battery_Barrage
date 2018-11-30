@@ -17,13 +17,26 @@ TextObjectManager txtObjMgr = {};
 TextRenderer textRenderer = {};
 TerrainRenderer terrainRenderer = {};
 
+@class WindowDelegate;
+@interface WindowDelegate : NSView <NSWindowDelegate> {
+@public
+	NSRect windowRect;
+}   
+@end
+
+@implementation WindowDelegate
+-(void)windowWillClose:(NSNotification *)notification {
+	[NSApp terminate:self];
+}
+@end
+
 void OSXreadBinaryFile(const s8* fileName, u8** fileData, u64* fileLength){
     NSString* string = [[NSString alloc] initWithUTF8String: fileName];
     NSData* data = [NSData dataWithContentsOfFile: string];
     *fileLength = [data length];
     *fileData = (u8*)[data bytes];
     [string release];
-    [data release];//this might cause problems
+    //[data release];//this might cause problems
 }
 
 void OSXreadTextFile(const s8* fileName, s8** fileData, u64* fileLength){
@@ -41,9 +54,13 @@ void OSXreadTextFile(const s8* fileName, s8** fileData, u64* fileLength){
 }
 
 const s8* OSXgetPathToExecutable(){
-    NSString *appParentDirectory = [[NSBundle mainBundle] bundlePath];
-    const s8* path = [appParentDirectory UTF8String];
-    [appParentDirectory release];
+    static bool initialized = false;
+    static const s8* path;
+    if(!initialized){
+        NSString *appParentDirectory = [[NSBundle mainBundle] bundlePath];
+        path = [appParentDirectory UTF8String];
+    }
+    //[appParentDirectory release];
     return path;
 }
 
@@ -63,19 +80,6 @@ const s8* OSXgetPathFromExecutable(const s8* path){
 
     return (const s8*)fullPath;
 }
-
-@class WindowDelegate;
-@interface WindowDelegate : NSView <NSWindowDelegate> {
-@public
-	NSRect windowRect;
-}   
-@end
-
-@implementation WindowDelegate
--(void)windowWillClose:(NSNotification *)notification {
-	[NSApp terminate:self];
-}
-@end
 
 void OSXdisplayMessageBox(const char* message){
     NSString* string = [[NSString alloc] initWithCString: message
@@ -166,13 +170,20 @@ int main(int argc, char** argv){
     camera.up = Vector3(0, 1, 0);
     camera.position = Vector3(0, -5, -100);
 
-    f32 moveSpeed = 0.5;
+    f32 moveSpeed = 0.2;
     bool moveForward = false;
     bool moveBack = false;
     bool moveLeft = false;
     bool moveRight = false;
     bool moveUp = false;
     bool moveDown = false;
+
+    bool yawLeft = false;
+    bool yawRight = false;
+    bool pitchUp = false;
+    bool pitchDown = false;
+    bool rollRight = false;
+    bool rollLeft = false;
     
     NSEvent* ev; 
     while(true){
@@ -212,6 +223,30 @@ int main(int argc, char** argv){
                             moveDown = true;
                             break;
                         }
+                        case kVK_RightArrow:{
+                            yawRight = true;
+                            break;
+                        }
+                        case kVK_LeftArrow:{
+                            yawLeft = true;
+                            break;
+                        }
+                        case kVK_UpArrow:{
+                            pitchUp = true;
+                            break;
+                        }
+                        case kVK_DownArrow:{
+                            pitchDown = true;
+                            break;
+                        }
+                        case kVK_ANSI_Q:{
+                            rollLeft = true;
+                            break;
+                        }
+                        case kVK_ANSI_E:{
+                            rollRight = true;
+                            break;
+                        }
                     }
                 }else if([ev type] == NSEventTypeKeyUp){
                     switch([ev keyCode]){
@@ -239,6 +274,30 @@ int main(int argc, char** argv){
                             moveDown = false;
                             break;
                         }
+                        case kVK_RightArrow:{
+                            yawRight = false;
+                            break;
+                        }
+                        case kVK_LeftArrow:{
+                            yawLeft = false;
+                            break;
+                        }
+                        case kVK_UpArrow:{
+                            pitchUp = false;
+                            break;
+                        }
+                        case kVK_DownArrow:{
+                            pitchDown = false;
+                            break;
+                        }
+                        case kVK_ANSI_Q:{
+                            rollLeft = false;
+                            break;
+                        }
+                        case kVK_ANSI_E:{
+                            rollRight = false;
+                            break;
+                        }
                     }
                 }else{
                     [NSApp sendEvent: ev];
@@ -264,12 +323,19 @@ int main(int argc, char** argv){
 
         renderDevice.prepareRenderer();
 
-        camera.position += (camera.forward * moveForward * moveSpeed);
-        camera.position -= (camera.forward * moveBack * moveSpeed);
+        camera.position -= (camera.forward * moveForward * moveSpeed);
+        camera.position += (camera.forward * moveBack * moveSpeed);
         camera.position += (camera.right * moveRight * moveSpeed);
         camera.position -= (camera.right * moveLeft * moveSpeed);
         camera.position -= (camera.up * moveUp * moveSpeed);
         camera.position += (camera.up * moveDown * moveSpeed);
+        
+        rotate(&camera.orientation, camera.up, yawRight * 0.01);
+        rotate(&camera.orientation, camera.up, yawLeft * -0.01);
+        rotate(&camera.orientation, camera.forward, rollLeft * 0.01);
+        rotate(&camera.orientation, camera.forward, rollRight * -0.01);
+        rotate(&camera.orientation, camera.right, pitchUp * -0.01);
+        rotate(&camera.orientation, camera.right, pitchDown * 0.01);
 
         prepareTerrainRenderer(&terrainRenderer);
         renderTerrain(&terrainRenderer, &terrain, &camera);

@@ -21,6 +21,17 @@ void renderTerrain(TerrainRenderer* terrainRenderer, Terrain* terrain, Camera* c
     viewMatrix.m[3][0] = camera->position.x;
     viewMatrix.m[3][1] = camera->position.y;
     viewMatrix.m[3][2] = camera->position.z;
+    viewMatrix = multiply(quaternionToMatrix4(camera->orientation), viewMatrix);
+    Vector3 newUp(viewMatrix.m[0][1], viewMatrix.m[1][1], viewMatrix.m[2][1]);
+    Vector3 newRight(viewMatrix.m[0][0], viewMatrix.m[1][0], viewMatrix.m[2][0]);
+    Vector3 newForward(-viewMatrix.m[0][2], -viewMatrix.m[1][2], -viewMatrix.m[2][2]);
+    normalize(&newUp);
+    normalize(&newRight);
+    normalize(&newForward);
+    camera->up = newUp;
+    camera->right = newRight;
+    camera->forward = newForward;
+
     Matrix4 mvMatrix = multiply(proj, viewMatrix);
     unis->projectionViewMatrix = mvMatrix;
 
@@ -30,10 +41,7 @@ void renderTerrain(TerrainRenderer* terrainRenderer, Terrain* terrain, Camera* c
 void initializeTerrainRenderer(OSDevice* osDevice, RenderDevice* renderDevice, TerrainRenderer* terrainRenderer){
     terrainRenderer->osDevice = osDevice;
     terrainRenderer->renderDevice = renderDevice;
-
-    u8* fontFileData;
-    u64 len;
-
+    
     u32 totalVertices = 40000;
     f32 width = sqrt(totalVertices);
     u32 totalRects = (u32)(width - 1) * (u32)(width - 1);

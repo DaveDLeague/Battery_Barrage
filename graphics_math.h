@@ -50,7 +50,7 @@ union Quaternion {
         f32 z;
         f32 w;
     };
-    Quaternion(){}
+    Quaternion(): x(0), y(0), z(0), w(1){}
     Quaternion(f32 val): x(val), y(val), z(val), w(val){}
     Quaternion(f32 x, f32 y, f32 z, f32 w): x(x), y(y), z(z), w(w){}
     Quaternion(Vector2 v2, f32 z, f32 w): x(v2.x), y(v2.y), z(z), w(w){}

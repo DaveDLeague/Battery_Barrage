@@ -119,9 +119,12 @@ void renderTextObjects(TextRenderer* textRenderer, TextObjectManager* txtObjMgr)
                     break;
                 }
             }
+            if(k == totalChars){
+                continue;
+            }
 
             f32 scale = txtObj->scale;
-             if(c == ' '){
+            if(c == ' '){
                 xMarker += charAtls->xShifts[k] * scale;
                 continue;
             }

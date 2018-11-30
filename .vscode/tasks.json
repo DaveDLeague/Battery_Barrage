@@ -5,50 +5,36 @@
             "label": "build and run",
             "type": "shell",
             "command": "sh build.sh build && ./game",
-            "group": {
-                "kind":"build",
-                "isDefault": true,
-            },
             "problemMatcher": "$msCompile"
         },
         {
             "label": "build only",
             "type": "shell",
             "command": "./build.sh build",
-            "group": {
-                "kind":"build",
-                "isDefault": true,
-            },
             "problemMatcher": "$msCompile"
         },
         {
             "label": "run",
             "type": "shell",
             "command": "./game ",
-            "group": {
-                "kind":"test",
-                "isDefault": true,
-            },
             "problemMatcher": "$msCompile"
         },
         {
             "label": "metal compile",
             "type": "shell",
             "command": "sh metal_compiler.sh basic_shader",
-            "group": {
-                "kind":"test",
-                "isDefault": true,
-            },
             "problemMatcher": "$msCompile"
         },
         {
             "label": "compile external",
             "type": "shell",
             "command": "sh build.sh compile",
-            "group": {
-                "kind":"test",
-                "isDefault": true,
-            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "memory build",
+            "type": "shell",
+            "command": "sh build.sh memoryBuild && ./game",
             "problemMatcher": "$msCompile"
         }
     ]

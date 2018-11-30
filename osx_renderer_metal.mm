@@ -36,6 +36,7 @@ static id<MTLRenderCommandEncoder> renderEncoder;
 static id<MTLSamplerState> linearSamplerState;
 static id<MTLSamplerState> nearestPointSamplerState;
 static id<MTLSamplerState>* currentSamplerState;
+static id<MTLDepthStencilState> depthStencilState;
 static MTLTextureDescriptor* textureDescriptor;
 static MTLRenderPipelineDescriptor *pipelineStateDescriptor;
 static MTKView * view;
@@ -252,6 +253,9 @@ void METALprepareRenderer(){
     commandQueue = [device newCommandQueue];
     commandBuffer = [commandQueue commandBuffer];
     renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:view.currentRenderPassDescriptor];
+    [renderEncoder setCullMode:MTLCullModeBack];
+    [renderEncoder setFrontFacingWinding:MTLWindingClockwise];
+    [renderEncoder setDepthStencilState: depthStencilState];   
 }
 
 void METALdrawVertices(u32 startVertex, u32 vertexCount, RenderDrawMode mode){
@@ -319,6 +323,7 @@ void initializeRenderDevice(RenderDevice* renderDevice, NSWindow* window){
     }
     view.paused = true;
     view.enableSetNeedsDisplay = false;
+    
     [window setContentView: view];
 
     pipelineStateDescriptor = [[MTLRenderPipelineDescriptor alloc] init];
@@ -333,6 +338,14 @@ void initializeRenderDevice(RenderDevice* renderDevice, NSWindow* window){
     samplerDescriptor.magFilter = MTLSamplerMinMagFilterLinear;
     linearSamplerState = [device newSamplerStateWithDescriptor: samplerDescriptor];
     currentSamplerState = &nearestPointSamplerState;
+
+    MTLDepthStencilDescriptor *depthDescriptor = [[MTLDepthStencilDescriptor alloc] init];
+    depthDescriptor.depthWriteEnabled = true;
+    depthDescriptor.depthCompareFunction = MTLCompareFunctionLess;
+    depthStencilState = [device newDepthStencilStateWithDescriptor: depthDescriptor];
+    [depthDescriptor release];
+
+    view.depthStencilPixelFormat = MTLPixelFormatDepth32Float;
 
     renderDevice->createTexture2DWithData = METALcreateTexture2DWithData;
     renderDevice->createBuffer = METALcreateBuffer;

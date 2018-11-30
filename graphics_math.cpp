@@ -56,6 +56,17 @@ Matrix4 multiply(Matrix4 m1, Matrix4 m2){
     return m; 
 }
 
+void normalize(Vector3* v){
+    float length = sqrt((v->x * v->x) + (v->y * v->y) + (v->z * v->z));
+    if(length == 0){
+        v->x = 0, v->y = 0, v->z = 0;
+    }else{
+        v->x /= length;
+        v->y /= length;
+        v->z /= length;
+    }
+}
+
 void normalize(Quaternion* q){
     float length = sqrt((q->x * q->x) + (q->y * q->y) + (q->z * q->z) + (q->w * q->w));
     if(length == 0){
@@ -80,6 +91,34 @@ Quaternion rotationToQuaternion(Vector3 axis, f32 angle){
     return q;
 }
 
+Matrix4 quaternionToMatrix4(Quaternion q){
+    normalize(&q);
+
+    Matrix4 m;
+
+    m.m[0][0] = 1 - (2 * (q.y * q.y)) - (2 * (q.z * q.z));
+    m.m[0][1] = (2 * q.x * q.y) + (2 * q.z * q.w);
+    m.m[0][2] = (2 * q.x * q.z) - (2 * q.y * q.w);
+    m.m[0][3] = 0;
+
+    m.m[1][0] = (2 * q.x * q.y) - (2 * q.z * q.w);
+    m.m[1][1] = 1 - (2 * q.x * q.x) - (2 * (q.z *  q.z));
+    m.m[1][2] = 2 * (q.y * q.z) + 2 * (q.x * q.w);
+    m.m[1][3] = 0;
+
+    m.m[2][0] = (2 * q.x * q.z) + (2 * q.y * q.w);
+    m.m[2][1] = (2 * q.y  * q.z) - (2 * q.x * q.w);
+    m.m[2][2] = 1 - (2 * q.x * q.x) - (2 * (q.y *  q.y));
+    m.m[2][3] = 0;
+
+    m.m[3][0] = 0;
+    m.m[3][1] = 0;
+    m.m[3][2] = 0;
+    m.m[3][3] = 1;
+
+    return m;
+}
+
 Quaternion multiply(Quaternion q1, Quaternion q2){
     Quaternion q;
     q.x =   q1.x * q2.w + q1.y * q2.z - q1.z * q2.y + q1.w * q2.x;
@@ -87,6 +126,11 @@ Quaternion multiply(Quaternion q1, Quaternion q2){
     q.z =   q1.x * q2.y - q1.y * q2.x + q1.z * q2.w + q1.w * q2.z;
     q.w =  -q1.x * q2.x - q1.y * q2.y - q1.z * q2.z + q1.w * q2.w;
     return q;
+}
+
+void rotate(Quaternion* q, Vector3 angle, f32 amount){
+    Quaternion r = rotationToQuaternion(angle, amount);
+    *q = multiply(*q, r);
 }
 
 Vector3 operator+(Vector3 v1, f32 v){
