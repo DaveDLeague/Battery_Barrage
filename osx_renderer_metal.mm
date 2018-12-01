@@ -37,6 +37,8 @@ static id<MTLSamplerState> linearSamplerState;
 static id<MTLSamplerState> nearestPointSamplerState;
 static id<MTLSamplerState>* currentSamplerState;
 static id<MTLDepthStencilState> depthStencilState;
+static id<MTLDepthStencilState> noDepthStencilState;
+static id<MTLDepthStencilState> *currentDepthStencilState;
 static MTLTextureDescriptor* textureDescriptor;
 static MTLRenderPipelineDescriptor *pipelineStateDescriptor;
 static MTKView * view;
@@ -68,6 +70,14 @@ void METALcreateTexture2DWithData(Texture2D* texture,
                mipmapLevel:mipMapLevel
                withBytes:data
                bytesPerRow:bytesPerRow];
+}
+
+void METALenableDepthTesting(bool enabled){
+    if(enabled){
+        currentDepthStencilState = &depthStencilState;
+    }else{
+        currentDepthStencilState = &noDepthStencilState;
+    }
 }
 
 void METALcreateBuffer(RenderBuffer* buffer, u32 size, u32 index){
@@ -255,7 +265,7 @@ void METALprepareRenderer(){
     renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:view.currentRenderPassDescriptor];
     [renderEncoder setCullMode:MTLCullModeBack];
     [renderEncoder setFrontFacingWinding:MTLWindingClockwise];
-    [renderEncoder setDepthStencilState: depthStencilState];   
+    [renderEncoder setDepthStencilState: *currentDepthStencilState];   
 }
 
 void METALdrawVertices(u32 startVertex, u32 vertexCount, RenderDrawMode mode){
@@ -343,8 +353,12 @@ void initializeRenderDevice(RenderDevice* renderDevice, NSWindow* window){
     depthDescriptor.depthWriteEnabled = true;
     depthDescriptor.depthCompareFunction = MTLCompareFunctionLess;
     depthStencilState = [device newDepthStencilStateWithDescriptor: depthDescriptor];
+
+    depthDescriptor.depthWriteEnabled = false;
+    noDepthStencilState = [device newDepthStencilStateWithDescriptor: depthDescriptor];
     [depthDescriptor release];
 
+    currentDepthStencilState = &noDepthStencilState;
     view.depthStencilPixelFormat = MTLPixelFormatDepth32Float;
 
     renderDevice->createTexture2DWithData = METALcreateTexture2DWithData;
@@ -366,4 +380,5 @@ void initializeRenderDevice(RenderDevice* renderDevice, NSWindow* window){
     renderDevice->bindTexture2D = METALbindTexture2D;
     renderDevice->getPointerToBufferData = METALgetPointerToBufferData;
     renderDevice->enableBlending = METALenableBlending;
+    renderDevice->enableDepthTesting = METALenableDepthTesting;
 }

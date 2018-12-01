@@ -115,5 +115,6 @@ struct RenderDevice {
     void (*drawIndices)(u32 offset, u32 count, RendererIndexType type, RenderDrawMode mode);
     void (*setClearColor)(float r, float g, float b, float a);
     void (*enableBlending)(bool enabled);
+    void (*enableDepthTesting)(bool enabled);
     void* (*getPointerToBufferData)(RenderBuffer* b);
 };

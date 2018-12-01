@@ -10,13 +10,18 @@ void prepareTerrainRenderer(TerrainRenderer* terrainRenderer){
     device->bindVertexBuffer(&terrainRenderer->vertexBuffer);
     device->bindIndexBuffer(&terrainRenderer->indexBuffer);
     device->bindVertexUniformBuffer(&terrainRenderer->uniformBuffer);
+    device->enableDepthTesting(true);
 }
-
+float x = 0;
+float y = 0;
+float z = 0;
 void renderTerrain(TerrainRenderer* terrainRenderer, Terrain* terrain, Camera* camera){
     RenderDevice* device = terrainRenderer->renderDevice;
 
     TerrainUniforms* unis = (TerrainUniforms*)device->getPointerToBufferData(&terrainRenderer->uniformBuffer);
     Matrix4 proj = createPerpectiveProjectionMatrix(70.0, 1280.0 / 720.0, 0.001, 1000.0);
+    unis->lightPosition = Vector3(x, y, z);
+    y+=0.1;
     Matrix4 viewMatrix = createIdentityMatrix();
     viewMatrix.m[3][0] = camera->position.x;
     viewMatrix.m[3][1] = camera->position.y;
@@ -72,12 +77,12 @@ void initializeTerrainRenderer(OSDevice* osDevice, RenderDevice* renderDevice, T
         if(cosX == 0){
             v1 = Vector3(0, 1, 0);
         }else{
-            v1 = normalize(Vector3(1, -1 / cosX, 0));
+            v1 = normalize(Vector3(1, 1 / cosX, 0));
         }
         if(cosZ == 0){
             v2 = Vector3(0, 1, 0);
         }else{
-            v2 = normalize(Vector3(0, -1 / cosZ, 1));
+            v2 = normalize(Vector3(0, 1 / cosZ, 1));
         }
 
         Vector3 norm = normalize(v1 + v2);

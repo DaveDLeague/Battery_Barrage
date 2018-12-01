@@ -168,7 +168,7 @@ int main(int argc, char** argv){
     camera.forward = Vector3(0, 0, 1);
     camera.right = Vector3(1, 0, 0);
     camera.up = Vector3(0, 1, 0);
-    camera.position = Vector3(0, -5, -100);
+    camera.position = Vector3(0, 0, 0);
 
     f32 moveSpeed = 0.2;
     bool moveForward = false;

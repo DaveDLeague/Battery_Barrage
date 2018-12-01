@@ -13,6 +13,7 @@ struct Terrain {
 
 struct TerrainUniforms {
     Matrix4 projectionViewMatrix;
+    Vector3 lightPosition;
 };
 
 struct TerrainRenderer {
