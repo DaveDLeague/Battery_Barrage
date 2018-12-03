@@ -2,15 +2,6 @@
 
 #include "renderer.h"
 
-struct TerrainVertex {
-    Vector2 position;
-};
-
-struct Terrain {
-    static const u32 HEIGHTMAP_WIDTH = 8;
-    TerrainVertex vertices[HEIGHTMAP_WIDTH][HEIGHTMAP_WIDTH];
-};
-
 struct TerrainUniforms {
     Matrix4 projectionViewMatrix;
     Vector3 lightPosition;

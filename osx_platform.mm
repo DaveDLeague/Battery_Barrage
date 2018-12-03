@@ -16,6 +16,9 @@ RenderDevice renderDevice = {};
 TextObjectManager txtObjMgr = {};
 TextRenderer textRenderer = {};
 TerrainRenderer terrainRenderer = {};
+MeshRenderer meshRenderer = {};
+
+Mesh mesh;
 
 @class WindowDelegate;
 @interface WindowDelegate : NSView <NSWindowDelegate> {
@@ -138,8 +141,10 @@ int main(int argc, char** argv){
     initializeTextRenderer(&osDevice, &renderDevice, &textRenderer);
     setTextRendererProjection(&textRenderer, 0, WIDTH, 0, HEIGHT);
 
-    Terrain terrain;
     initializeTerrainRenderer(&osDevice, &renderDevice, &terrainRenderer);
+
+    initializeMeshRenderer(&osDevice, &renderDevice, &meshRenderer);
+    mesh.indexCount = 6;
 
     void* handle = dlopen(OSXgetPathFromExecutable("libbb.so"), RTLD_LAZY);
     typedef void (*fnPtr)(float, BatteryBarrageState*);
@@ -156,7 +161,7 @@ int main(int argc, char** argv){
     }
 
     TextObject* nums = createTextObject(&txtObjMgr, "1234567890", 50, 650);
-    TextObject* spec = createTextObject(&txtObjMgr, "`~!@#$\\/%^&*()-_=+?><\";", 50, 600);
+    TextObject* spec = createTextObject(&txtObjMgr, "!@#$\\/%^&*()-_=+?><\";", 50, 600);
     TextObject* tpLo = createTextObject(&txtObjMgr, "qwertyuiop", 50, 550);
     TextObject* mdLo = createTextObject(&txtObjMgr, "asdfghjkl", 50, 500);
     TextObject* btLo = createTextObject(&txtObjMgr, "zxcvbnm", 50, 450);
@@ -185,6 +190,8 @@ int main(int argc, char** argv){
     bool rollRight = false;
     bool rollLeft = false;
     
+    CGDisplayHideCursor(kCGDirectMainDisplay);
+
     NSEvent* ev; 
     while(true){
         do {
@@ -305,6 +312,15 @@ int main(int argc, char** argv){
             }
         } while (ev);
 
+        s32 mx, my;
+        CGGetLastMouseDelta(&mx, &my);
+        printf("%i\t%i\n", mx, my);
+
+        CGPoint p;
+        p.x = WIDTH / 2;
+        p.y = HEIGHT / 2;
+        CGWarpMouseCursorPosition(p);
+
         #ifdef DEBUG_COMPILE
         @autoreleasepool {
             attrs = [[NSFileManager defaultManager] attributesOfItemAtPath:path error:&error];
@@ -337,8 +353,14 @@ int main(int argc, char** argv){
         rotate(&camera.orientation, camera.right, pitchUp * -0.01);
         rotate(&camera.orientation, camera.right, pitchDown * 0.01);
 
+        rotate(&camera.orientation, camera.up, mx * 0.01);
+        rotate(&camera.orientation, camera.right, my * 0.01);
+
         prepareTerrainRenderer(&terrainRenderer);
-        renderTerrain(&terrainRenderer, &terrain, &camera);
+        renderTerrain(&terrainRenderer, &camera);
+
+        prepareMeshRenderer(&meshRenderer);
+        renderMeshes(&meshRenderer, &mesh, 1, &camera);
 
         prepareTextRenderer(&textRenderer);
         renderTextObjects(&textRenderer, &txtObjMgr);

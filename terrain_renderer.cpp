@@ -1,9 +1,5 @@
 #include "terrain_renderer.h"
 
-void initializeTerrain(Terrain* terrain){
-
-}
-
 void prepareTerrainRenderer(TerrainRenderer* terrainRenderer){
     RenderDevice* device = terrainRenderer->renderDevice;
     device->bindShader(&terrainRenderer->shader);
@@ -12,16 +8,16 @@ void prepareTerrainRenderer(TerrainRenderer* terrainRenderer){
     device->bindVertexUniformBuffer(&terrainRenderer->uniformBuffer);
     device->enableDepthTesting(true);
 }
-float x = 0;
-float y = 0;
-float z = 0;
-void renderTerrain(TerrainRenderer* terrainRenderer, Terrain* terrain, Camera* camera){
+
+void renderTerrain(TerrainRenderer* terrainRenderer, Camera* camera){
     RenderDevice* device = terrainRenderer->renderDevice;
 
     TerrainUniforms* unis = (TerrainUniforms*)device->getPointerToBufferData(&terrainRenderer->uniformBuffer);
+
+    //TODO: get rid of hard coded numbers for width and height
     Matrix4 proj = createPerpectiveProjectionMatrix(70.0, 1280.0 / 720.0, 0.001, 1000.0);
-    unis->lightPosition = Vector3(x, y, z);
-    y+=0.1;
+    unis->lightPosition = Vector3(0, 0, 0);
+    
     Matrix4 viewMatrix = createIdentityMatrix();
     viewMatrix.m[3][0] = camera->position.x;
     viewMatrix.m[3][1] = camera->position.y;
